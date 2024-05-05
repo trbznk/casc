@@ -8,10 +8,12 @@
 
 typedef enum {
     TOKEN_NUMBER,
+    TOKEN_IDENTIFIER,
     TOKEN_PLUS,
     TOKEN_MINUS,
     TOKEN_STAR,
     TOKEN_SLASH,
+    TOKEN_CARET,
 
     TOKEN_L_PAREN,
     TOKEN_R_PAREN,
@@ -27,16 +29,18 @@ typedef struct {
 typedef struct {
     size_t size;
     size_t capacity;
-    Token *data;    
-} Tokens;
+    Token *tokens;    
+} Lexer;
 
 const char* token_type_to_string(TokenType type) {
     static const char* names[] = {
         "NUMBER",
+        "IDENTIFIER",
         "PLUS",
         "MINUS",
         "STAR",
         "SLASH",
+        "CARET",
         "L_PAREN",
         "R_PAREN"
     };
@@ -47,26 +51,22 @@ const char* token_type_to_string(TokenType type) {
     return names[type];
 }
 
-void tokens_push(Tokens *tokens, Token token) {
+void lexer_push(Lexer *lexer, Token token) {
     const size_t alloc_capacity = 10;
-    if (tokens->size >= tokens->capacity) {
-        if (tokens->size == 0) {
-            tokens->data = malloc(alloc_capacity*sizeof(Token));
+    if (lexer->size >= lexer->capacity) {
+        if (lexer->size == 0) {
+            lexer->tokens = malloc(alloc_capacity*sizeof(Token));
         } else {
-            tokens->data = realloc(tokens->data ,(tokens->size+alloc_capacity)*sizeof(Token));
+            lexer->tokens = realloc(lexer->tokens ,(lexer->size+alloc_capacity)*sizeof(Token));
         }
-        tokens->capacity = tokens->capacity + alloc_capacity;
+        lexer->capacity = lexer->capacity + alloc_capacity;
     }
-    tokens->data[tokens->size] = token;
-    tokens->size++;
+    lexer->tokens[lexer->size] = token;
+    lexer->size++;
 }
 
-int main() {
-    char *source = "(42 + 6) - 3333 * (4 + 12)/9";
-    printf("source: '%s'\n", source);
-
-    // tokenize source
-    Tokens tokens = {0};
+Lexer lex(char* source) {
+    Lexer lexer = {0};
     for (size_t i = 0; i < strlen(source); i++) {
         if (isdigit(source[i])) {
             char number_buffer[FIXED_STRING_SIZE] = "";
@@ -74,41 +74,49 @@ int main() {
                 strncat(number_buffer, &source[i], 1);
                 i++;
             }
-            Token token;
-            token.type = TOKEN_NUMBER;
+            Token token = { .type = TOKEN_NUMBER };
             strcpy(token.lexeme, number_buffer);
-            tokens_push(&tokens, token);
+            lexer_push(&lexer, token);
+            i--;
+        } else if (isalpha(source[i])) {
+            char number_buffer[FIXED_STRING_SIZE] = "";
+            size_t first = i;
+            while (isalpha(source[i]) || (i > first && (isalpha(source[i]) || isdigit(source[i])))) {
+                strncat(number_buffer, &source[i], 1);
+                i++;
+            }
+            Token token = { .type = TOKEN_IDENTIFIER };
+            strcpy(token.lexeme, number_buffer);
+            lexer_push(&lexer, token);
             i--;
         } else if (source[i] == '+') {
-            Token token;
-            token.type = TOKEN_PLUS;
+            Token token = { .type = TOKEN_PLUS };
             strncpy(token.lexeme, &source[i], 1);
-            tokens_push(&tokens, token);
+            lexer_push(&lexer, token);
         } else if (source[i] == '-') {
-            Token token;
-            token.type = TOKEN_MINUS;
+            Token token = { .type = TOKEN_MINUS };
             strncpy(token.lexeme, &source[i], 1);
-            tokens_push(&tokens, token);
+            lexer_push(&lexer, token);
         } else if (source[i] == '*') {
-            Token token;
-            token.type = TOKEN_STAR;
+            Token token = { .type = TOKEN_STAR };
             strncpy(token.lexeme, &source[i], 1);
-            tokens_push(&tokens, token);
+            lexer_push(&lexer, token);
         } else if (source[i] == '/') {
-            Token token;
-            token.type = TOKEN_SLASH;
+            Token token = { .type = TOKEN_SLASH };
             strncpy(token.lexeme, &source[i], 1);
-            tokens_push(&tokens, token);
+            lexer_push(&lexer, token);
+        } else if (source[i] == '^') {
+            Token token = { .type = TOKEN_CARET };
+            strncpy(token.lexeme, &source[i], 1);
+            lexer_push(&lexer, token);
         } else if (source[i] == '(') {
-            Token token;
-            token.type = TOKEN_L_PAREN;
+            Token token = { .type = TOKEN_L_PAREN };
             strncpy(token.lexeme, &source[i], 1);
-            tokens_push(&tokens, token);
+            lexer_push(&lexer, token);
         } else if (source[i] == ')') {
-            Token token;
-            token.type = TOKEN_R_PAREN;
+            Token token = { .type = TOKEN_R_PAREN };
             strncpy(token.lexeme, &source[i], 1);
-            tokens_push(&tokens, token);
+            lexer_push(&lexer, token);
         } else if (isspace(source[i])) {
             // ignore spaces for now
         } else {
@@ -116,13 +124,20 @@ int main() {
             exit(1);
         }
     }
+    return lexer;
+}
+
+int main() {
+    char *source = "2x(42 + 6) - 3333 * (4 + 12 + x2)/9 + (x^2 - y^2)";
+    printf("source: '%s'\n", source);
+    Lexer lexer = lex(source);
 
     // print tokens
-    for (size_t i = 0; i < tokens.size; i++) {
-        Token *token = &tokens.data[i];
+    for (size_t i = 0; i < lexer.size; i++) {
+        Token *token = &lexer.tokens[i];
         printf("%s('%s') ", token_type_to_string(token->type), token->lexeme);
     }
     printf("\n");
 
-    printf("tokens.size=%zu, tokens.capacity=%zu\n", tokens.size, tokens.capacity);
+    printf("lexer.size=%zu, lexer.capacity=%zu\n", lexer.size, lexer.capacity);
 }
