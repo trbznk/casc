@@ -45,12 +45,16 @@ typedef enum {
     OP_MUL,
     OP_DIV,
 
+    OP_UADD,
+    OP_USUB,
+
     OP_TYPE_COUNT
 } OpType;
 
 typedef enum {
     NODE_INTEGER,
     NODE_BINOP,
+    NODE_UNARYOP,
 
     NODE_TYPE_COUNT
 } NodeType;
@@ -58,8 +62,7 @@ typedef enum {
 struct Node {
     Node* left;
     Node* right;
-    Node* nominator;
-    Node* denominator;
+    Node* expr;
 
     NodeType type;
     OpType op_type;
@@ -93,7 +96,9 @@ const char* op_type_name(OpType type) {
         "Add",
         "Sub",
         "Mul",
-        "Div"
+        "Div",
+        "UAdd",
+        "USub"
     };
     _Static_assert(sizeof(names)/sizeof(names[0]) == OP_TYPE_COUNT, "ERROR: Wrong number of names.");
     assert(type < OP_TYPE_COUNT);
@@ -103,7 +108,8 @@ const char* op_type_name(OpType type) {
 const char* node_type_name(NodeType type) {
     static const char* names[] = {
         "Integer",
-        "BinOp"
+        "BinOp",
+        "UnaryOp"
     };
     _Static_assert(sizeof(names)/sizeof(names[0]) == NODE_TYPE_COUNT, "ERROR: Wrong number of names.");
     assert(type < NODE_TYPE_COUNT);
@@ -216,6 +222,14 @@ Node* ast_binop(Node* left, Node* right, OpType op_type) {
     return node;
 }
 
+Node* ast_unaryop(Node* expr, OpType op_type) {
+    Node* node = malloc(sizeof(Node));
+    node->type = NODE_UNARYOP;
+    node->expr = expr;
+    node->op_type = op_type;
+    return node;
+}
+
 bool node_eq(Node* left, Node* right) {
     if (left->type == right->type) {
         switch (left->type) {
@@ -236,9 +250,15 @@ Node* parse_factor(Parser* parser) {
         return ast_integer(atoi(token.lexeme));   
     } else if (token.type == TOKEN_L_PAREN) {
         parser_expect(parser, TOKEN_L_PAREN);
-        Node* result = parse_expr(parser);
+        Node* r = parse_expr(parser);
         parser_expect(parser, TOKEN_R_PAREN);
-        return result;
+        return r;
+    } else if (token.type == TOKEN_MINUS) {
+        parser_expect(parser, TOKEN_MINUS);
+        return ast_unaryop(parse_factor(parser), OP_USUB);
+    } else if (token.type == TOKEN_PLUS) {
+        parser_expect(parser, TOKEN_PLUS);
+        return ast_unaryop(parse_factor(parser), OP_UADD);
     } else {
         assert(false);
     }
@@ -249,10 +269,10 @@ Node* parse_term(Parser* parser) {
     while (parser->lexer.tokens[parser->pos].type == TOKEN_STAR || parser->lexer.tokens[parser->pos].type == TOKEN_SLASH) {
         if (parser->lexer.tokens[parser->pos].type == TOKEN_STAR) {
             parser_expect(parser, TOKEN_STAR);
-            result = ast_binop(result, parse_term(parser), OP_MUL);
+            result = ast_binop(result, parse_factor(parser), OP_MUL);
         } else if (parser->lexer.tokens[parser->pos].type == TOKEN_SLASH) {
             parser_expect(parser, TOKEN_SLASH);
-            result = ast_binop(result, parse_term(parser), OP_DIV);
+            result = ast_binop(result, parse_factor(parser), OP_DIV);
         }
     }
     return result;
@@ -280,20 +300,11 @@ char* node_to_string(Node* node) {
     switch (node->type) {
         case NODE_INTEGER: sprintf(output, "%s(%d)", node_type_name(node->type), node->value_i32); break;
         case NODE_BINOP: sprintf(output, "%s(%s, %s)", op_type_name(node->op_type), node_to_string(node->left), node_to_string(node->right)); break;
+        case NODE_UNARYOP: sprintf(output, "%s(%s)", op_type_name(node->op_type), node_to_string(node->expr)); break;
         default: fprintf(stderr, "ERROR: node type %s not implemented.\n", node_type_name(node->type)); exit(1);
     }
     return output;
 }
-
-// bool node_binop_is_op_type(Node* node, OpType op_type) {
-//     if (node->type == NODE_BINOP) {
-//         if (node->op_type == op_type) {
-
-//         }
-//     } else {
-//         return false;
-//     }
-// }
 
 Node* interp_binop(Node* node) {
     // depth first
@@ -303,17 +314,26 @@ Node* interp_binop(Node* node) {
 
     if (left->type == NODE_INTEGER && right->type == NODE_INTEGER) {
         switch (op_type) {
-            case OP_ADD: assert(false);
-            case OP_SUB: assert(false);
+            case OP_ADD: return ast_integer(left->value_i32 + right->value_i32);
+            case OP_SUB: return ast_integer(left->value_i32 - right->value_i32);
             case OP_MUL: return ast_integer(left->value_i32 * right->value_i32);
             case OP_DIV: {
-                return ast_binop(left, right, op_type);
+                if (left->value_i32 % right->value_i32 == 0) {
+                    return ast_integer(left->value_i32 / right->value_i32);
+                } else {
+                    return ast_binop(left, right, op_type);
+                }
             }
             default: assert(false);
         }
     } else if (left->type == NODE_INTEGER && right->type == NODE_BINOP && right->op_type == OP_DIV) {
         switch (op_type) {
-            case OP_ADD: assert(false);
+            case OP_ADD: {
+                // c + a/b
+                // -> (cb)/b + a/b
+                Node* r = ast_binop(ast_binop(ast_binop(left, right->right, OP_MUL), right->right, OP_DIV), right, OP_ADD);
+                return interp_binop(r);
+            }
             case OP_SUB: assert(false);
             case OP_MUL: {
                 Node* r = ast_binop(ast_binop(left, right->left, OP_MUL), right->right, OP_DIV);
@@ -327,10 +347,27 @@ Node* interp_binop(Node* node) {
     return ast_binop(left, right, op_type);
 }
 
+Node* interp_unaryop(Node* node) {
+    Node* expr = interp(node->expr);
+    OpType op_type = node->op_type;
+
+    if (expr->type == NODE_INTEGER) {
+        switch (op_type) {
+            case OP_UADD: return ast_integer(+expr->value_i32);
+            case OP_USUB: return ast_integer(-expr->value_i32);
+            default: assert(false);
+        }
+    }
+
+    return ast_unaryop(expr, op_type);
+}
+
 Node* interp(Node* node) {
     switch (node->type) {
         case NODE_BINOP:
             return interp_binop(node);
+        case NODE_UNARYOP:
+            return interp_unaryop(node);
         case NODE_INTEGER:
             return node;
         default:
@@ -339,11 +376,44 @@ Node* interp(Node* node) {
     }
 }
 
+void test() {
+    size_t id = 0;
+    #define TEST_CASE(source, test_case) {{ \
+        Lexer lexer = lex(source); \
+        Parser parser = { .lexer = lexer, .pos=0 }; \
+        Node* ast = parse_expr(&parser); \
+        Node* output = interp(ast); \
+        printf("test %02zu...........................", id);\
+        if (!node_eq(output, test_case)) {\
+            printf("failed\n");\
+            exit(1); \
+        } else { \
+            printf("passed\n");\
+        }\
+        id++;\
+    }}
+    TEST_CASE("27 + 3", ast_integer(30));
+    TEST_CASE("27 - 7", ast_integer(20));
+    TEST_CASE("7 - 3 + 2 - 1", ast_integer(5));
+    TEST_CASE("10 + 1 + 2 - 3 + 4 + 6 - 15", ast_integer(5));
+    TEST_CASE("7 * 4 / 2", ast_integer(14));
+    TEST_CASE("7 * 4 / 2 * 3", ast_integer(42));
+    TEST_CASE("10 * 4  * 2 * 3 / 8", ast_integer(30));
+    TEST_CASE("7 - 8 / 4", ast_integer(5));
+    TEST_CASE("14 + 2 * 3 - 6 / 2", ast_integer(17));
+    TEST_CASE("7 + 3 * (10 / (12 / (3 + 1) - 1))", ast_integer(22));
+    TEST_CASE("7 + 3 * (10 / (12 / (3 + 1) - 1)) / (2 + 3) - 5 - 3 + (8)", ast_integer(10));
+    TEST_CASE("7 + (((3 + 2)))", ast_integer(12));
+    TEST_CASE("- 3", ast_integer(-3));
+    TEST_CASE("+ 3", ast_integer(3));
+    TEST_CASE("5 - - - + - 3", ast_integer(8));
+    TEST_CASE("5 - - - + - (3 + 4) - +2", ast_integer(10));
+}
+
 int main() {
-    // char *source = "2x(42 + 6) - 3333 * (4 + 12 + x2)/9 + (x^2 - y^2)";
-    // char *source = "7 + 3 * (10 / (12 / (3 + 1) - 1)) / (2 + 3) - 5 - 3 + (8)";
-    // char *source = "2 + 7 * 4"; // 30
-    char *source = "3*(1/2)";
+    test();
+
+    char *source = "7 * 4 / 2 * 3";
     printf("source................\n'%s'\n", source);
     Lexer lexer = lex(source);
     Parser parser = { .lexer = lexer, .pos=0 };
