@@ -25,6 +25,8 @@ typedef enum {
     TOKEN_L_PAREN,
     TOKEN_R_PAREN,
 
+    TOKEN_EOF,
+
     TOKEN_TYPE_COUNT
 } TokenType;
 
@@ -84,7 +86,8 @@ const char* token_type_name(TokenType type) {
         "SLASH",
         "CARET",
         "L_PAREN",
-        "R_PAREN"
+        "R_PAREN",
+        "EOF"
     };
     _Static_assert(sizeof(names)/sizeof(names[0]) == TOKEN_TYPE_COUNT, "ERROR: Wrong number of names.");
     assert(type < TOKEN_TYPE_COUNT);
@@ -132,7 +135,8 @@ void lexer_push(Lexer *lexer, Token token) {
 
 Lexer lex(char* source) {
     Lexer lexer = {0};
-    for (size_t i = 0; i < strlen(source); i++) {
+    size_t i = 0;
+    while (i < strlen(source)) {
         if (isdigit(source[i])) {
             char number_buffer[FIXED_STRING_SIZE] = "";
             while (isdigit(source[i])) {
@@ -188,7 +192,10 @@ Lexer lex(char* source) {
             fprintf(stderr, "ERROR: Can't tokenize '%c'\n", source[i]);
             exit(1);
         }
+        i++;
     }
+    assert(i == strlen(source));
+    lexer_push(&lexer, (Token){ .type=TOKEN_EOF });
     return lexer;
 }
 
@@ -281,6 +288,7 @@ Node* parse_term(Parser* parser) {
 Node* parse_expr(Parser* parser) {
     Node* result = parse_term(parser);
 
+    assert(parser->pos < parser->lexer.size);
     while (parser->lexer.tokens[parser->pos].type == TOKEN_PLUS || parser->lexer.tokens[parser->pos].type == TOKEN_MINUS) {
         if (parser->lexer.tokens[parser->pos].type == TOKEN_PLUS) {
             parser_expect(parser, TOKEN_PLUS);
