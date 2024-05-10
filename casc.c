@@ -38,8 +38,8 @@ typedef struct {
 typedef struct {
     size_t size;
     size_t capacity;
-    Token *tokens;    
-} Lexer;
+    Token *data;    
+} Tokens;
 
 typedef enum {
     OP_ADD,
@@ -72,7 +72,7 @@ struct Node {
 };
 
 struct Parser {
-    Lexer lexer;
+    Tokens tokens;
     size_t pos;
 };
 
@@ -119,22 +119,22 @@ const char* node_type_name(NodeType type) {
     return names[type];
 }
 
-void lexer_push(Lexer *lexer, Token token) {
+void tokens_append(Tokens *tokens, Token token) {
     const size_t alloc_capacity = 10;
-    if (lexer->size >= lexer->capacity) {
-        if (lexer->size == 0) {
-            lexer->tokens = malloc(alloc_capacity*sizeof(Token));
+    if (tokens->size >= tokens->capacity) {
+        if (tokens->size == 0) {
+            tokens->data = malloc(alloc_capacity*sizeof(Token));
         } else {
-            lexer->tokens = realloc(lexer->tokens ,(lexer->size+alloc_capacity)*sizeof(Token));
+            tokens->data = realloc(tokens->data ,(tokens->size+alloc_capacity)*sizeof(Token));
         }
-        lexer->capacity = lexer->capacity + alloc_capacity;
+        tokens->capacity = tokens->capacity + alloc_capacity;
     }
-    lexer->tokens[lexer->size] = token;
-    lexer->size++;
+    tokens->data[tokens->size] = token;
+    tokens->size++;
 }
 
-Lexer lex(char* source) {
-    Lexer lexer = {0};
+Tokens tokenize(char* source) {
+    Tokens tokens = {0};
     size_t i = 0;
     while (i < strlen(source)) {
         if (isdigit(source[i])) {
@@ -145,7 +145,7 @@ Lexer lex(char* source) {
             }
             Token token = { .type = TOKEN_NUMBER };
             strcpy(token.lexeme, number_buffer);
-            lexer_push(&lexer, token);
+            tokens_append(&tokens, token);
             i--;
         } else if (isalpha(source[i])) {
             char number_buffer[FIXED_STRING_SIZE] = "";
@@ -156,36 +156,36 @@ Lexer lex(char* source) {
             }
             Token token = { .type = TOKEN_IDENTIFIER };
             strcpy(token.lexeme, number_buffer);
-            lexer_push(&lexer, token);
+            tokens_append(&tokens, token);
             i--;
         } else if (source[i] == '+') {
             Token token = { .type = TOKEN_PLUS };
             strncpy(token.lexeme, &source[i], 1);
-            lexer_push(&lexer, token);
+            tokens_append(&tokens, token);
         } else if (source[i] == '-') {
             Token token = { .type = TOKEN_MINUS };
             strncpy(token.lexeme, &source[i], 1);
-            lexer_push(&lexer, token);
+            tokens_append(&tokens, token);
         } else if (source[i] == '*') {
             Token token = { .type = TOKEN_STAR };
             strncpy(token.lexeme, &source[i], 1);
-            lexer_push(&lexer, token);
+            tokens_append(&tokens, token);
         } else if (source[i] == '/') {
             Token token = { .type = TOKEN_SLASH };
             strncpy(token.lexeme, &source[i], 1);
-            lexer_push(&lexer, token);
+            tokens_append(&tokens, token);
         } else if (source[i] == '^') {
             Token token = { .type = TOKEN_CARET };
             strncpy(token.lexeme, &source[i], 1);
-            lexer_push(&lexer, token);
+            tokens_append(&tokens, token);
         } else if (source[i] == '(') {
             Token token = { .type = TOKEN_L_PAREN };
             strncpy(token.lexeme, &source[i], 1);
-            lexer_push(&lexer, token);
+            tokens_append(&tokens, token);
         } else if (source[i] == ')') {
             Token token = { .type = TOKEN_R_PAREN };
             strncpy(token.lexeme, &source[i], 1);
-            lexer_push(&lexer, token);
+            tokens_append(&tokens, token);
         } else if (isspace(source[i])) {
             // ignore spaces for now
         } else {
@@ -195,21 +195,21 @@ Lexer lex(char* source) {
         i++;
     }
     assert(i == strlen(source));
-    lexer_push(&lexer, (Token){ .type=TOKEN_EOF });
-    return lexer;
+    tokens_append(&tokens, (Token){ .type=TOKEN_EOF });
+    return tokens;
 }
 
 Token parser_next_token(Parser* parser) {
-    Token next_token = parser->lexer.tokens[parser->pos];
+    Token next_token = parser->tokens.data[parser->pos];
     parser->pos++;
     return next_token;
 }
 
 void parser_expect(Parser* parser, TokenType type) {
-    if (parser->lexer.tokens[parser->pos].type == type) {
+    if (parser->tokens.data[parser->pos].type == type) {
         parser->pos++;
     } else {
-        fprintf(stderr, "ERROR: Expected %s got %s.", token_type_name(type), token_type_name(parser->lexer.tokens[parser->pos].type));
+        fprintf(stderr, "ERROR: Expected %s got %s.", token_type_name(type), token_type_name(parser->tokens.data[parser->pos].type));
     }
 }
 
@@ -251,7 +251,7 @@ bool node_eq(Node* left, Node* right) {
 }
 
 Node* parse_factor(Parser* parser) {
-    Token token = parser->lexer.tokens[parser->pos];
+    Token token = parser->tokens.data[parser->pos];
     if (token.type == TOKEN_NUMBER) {
         parser_expect(parser, TOKEN_NUMBER);
         return ast_integer(atoi(token.lexeme));   
@@ -273,11 +273,11 @@ Node* parse_factor(Parser* parser) {
 
 Node* parse_term(Parser* parser) {
     Node* result = parse_factor(parser);
-    while (parser->lexer.tokens[parser->pos].type == TOKEN_STAR || parser->lexer.tokens[parser->pos].type == TOKEN_SLASH) {
-        if (parser->lexer.tokens[parser->pos].type == TOKEN_STAR) {
+    while (parser->tokens.data[parser->pos].type == TOKEN_STAR || parser->tokens.data[parser->pos].type == TOKEN_SLASH) {
+        if (parser->tokens.data[parser->pos].type == TOKEN_STAR) {
             parser_expect(parser, TOKEN_STAR);
             result = ast_binop(result, parse_factor(parser), OP_MUL);
-        } else if (parser->lexer.tokens[parser->pos].type == TOKEN_SLASH) {
+        } else if (parser->tokens.data[parser->pos].type == TOKEN_SLASH) {
             parser_expect(parser, TOKEN_SLASH);
             result = ast_binop(result, parse_factor(parser), OP_DIV);
         }
@@ -288,12 +288,12 @@ Node* parse_term(Parser* parser) {
 Node* parse_expr(Parser* parser) {
     Node* result = parse_term(parser);
 
-    assert(parser->pos < parser->lexer.size);
-    while (parser->lexer.tokens[parser->pos].type == TOKEN_PLUS || parser->lexer.tokens[parser->pos].type == TOKEN_MINUS) {
-        if (parser->lexer.tokens[parser->pos].type == TOKEN_PLUS) {
+    assert(parser->pos < parser->tokens.size);
+    while (parser->tokens.data[parser->pos].type == TOKEN_PLUS || parser->tokens.data[parser->pos].type == TOKEN_MINUS) {
+        if (parser->tokens.data[parser->pos].type == TOKEN_PLUS) {
             parser_expect(parser, TOKEN_PLUS);
             result = ast_binop(result, parse_term(parser), OP_ADD);
-        } else if (parser->lexer.tokens[parser->pos].type == TOKEN_MINUS) {
+        } else if (parser->tokens.data[parser->pos].type == TOKEN_MINUS) {
             parser_expect(parser, TOKEN_MINUS);
             result = ast_binop(result, parse_term(parser), OP_SUB);
         }
@@ -387,8 +387,8 @@ Node* interp(Node* node) {
 void test() {
     size_t id = 0;
     #define TEST_CASE(source, test_case) {{ \
-        Lexer lexer = lex(source); \
-        Parser parser = { .lexer = lexer, .pos=0 }; \
+        Tokens tokens = tokenize(source); \
+        Parser parser = { .tokens = tokens, .pos=0 }; \
         Node* ast = parse_expr(&parser); \
         Node* output = interp(ast); \
         printf("test %02zu...........................", id);\
@@ -423,14 +423,14 @@ int main() {
 
     char *source = "7 * 4 / 2 * 3";
     printf("source................\n'%s'\n", source);
-    Lexer lexer = lex(source);
-    Parser parser = { .lexer = lexer, .pos=0 };
+    Tokens tokens = tokenize(source);
+    Parser parser = { .tokens = tokens, .pos=0 };
     Node* ast = parse_expr(&parser);
 
     // print tokens
     printf("tokens................\n");
-    for (size_t i = 0; i < lexer.size; i++) {
-        Token *token = &lexer.tokens[i];
+    for (size_t i = 0; i < tokens.size; i++) {
+        Token *token = &tokens.data[i];
         printf("%s('%s') ", token_type_name(token->type), token->lexeme);
     }
     printf("\n");
