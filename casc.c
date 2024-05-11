@@ -467,6 +467,22 @@ Node* interp(Node* node) {
     }
 }
 
+Node* simplify(Node* node) {
+    if (node->type == NODE_FUNC && node->func_type == FUNC_SQRT && node->expr->type == NODE_INTEGER) {
+        // @Speed: this is probably an inefficient way to compute the biggest perfect sqaure factor of a given number
+        for (int q = node->expr->value_i32; q > 1; q--) {
+            double sqrt_of_q = sqrtf((double)q);
+            bool is_perfect_square = sqrt_of_q == floor(sqrt_of_q);
+            if (is_perfect_square && node->expr->value_i32 % q == 0) {
+                int p = node->expr->value_i32 / q;
+                return ast_binop(ast_integer((int)sqrt_of_q), ast_func(FUNC_SQRT, ast_integer(p)), OP_MUL);
+            }
+        }
+    }
+
+    return node;
+}
+
 void test() {
     size_t test_id = 0;
 
@@ -499,6 +515,22 @@ void test() {
         test_id++;\
     }}
 
+    #define TEST_SOURCE_TO_SIMPLIFY(source, test_case) {{ \
+        Tokens tokens = tokenize(source); \
+        Parser parser = { .tokens = tokens, .pos=0 }; \
+        Node* ast = parse_expr(&parser); \
+        Node* output = interp(ast); \
+        Node* simpl_output = simplify(output); \
+        printf("test %02zu...........................", test_id);\
+        if (!node_eq(simpl_output, test_case)) {\
+            printf("failed\n");\
+            exit(1); \
+        } else { \
+            printf("passed\n");\
+        }\
+        test_id++;\
+    }}
+
     // ruslanspivak interpreter tutorial tests
     TEST_SOURCE_TO_INTERP("27 + 3", ast_integer(30));
     TEST_SOURCE_TO_INTERP("27 - 7", ast_integer(20));
@@ -519,6 +551,7 @@ void test() {
 
     // things from the sympy tutorial
     TEST_SOURCE_TO_PARSE("sqrt(3)", ast_func(FUNC_SQRT, ast_integer(3)));
+    TEST_SOURCE_TO_SIMPLIFY("sqrt(8)", ast_binop(ast_integer(2), ast_func(FUNC_SQRT, ast_integer(2)), OP_MUL));
 
     // misc
     TEST_SOURCE_TO_INTERP("sqrt(9)", ast_integer(3));
@@ -537,9 +570,9 @@ int main() {
 #if 1
     test();
 #endif
-
-    // char *source = "sqrt(8)";
-    char *source = "sqrt(9)";
+    
+    char *source = "sqrt(12)";
+    // char *source = "sqrt(9)";
     Tokens tokens = tokenize(source);
     tokens_print(&tokens);
 
@@ -550,4 +583,8 @@ int main() {
     Node* output = interp(ast);
     printf("%s\n", node_to_debug_string(output));
     printf("%s\n", node_to_string(output));
+
+    Node* simpl_output = simplify(output);
+    printf("%s\n", node_to_debug_string(simpl_output));
+    printf("%s\n", node_to_string(simpl_output));
 }
