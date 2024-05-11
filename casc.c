@@ -8,11 +8,12 @@
 
 #define FIXED_STRING_SIZE 32
 
-// forward declaration
+// forward declarations
 typedef struct Node Node;
 typedef struct Parser Parser;
-Node* parse_expr(Parser* parser);
-Node* interp(Node* node);
+Node* parse_expr(Parser*);
+Node* interp(Node*);
+Node* interp_binop(Node*);
 
 typedef enum {
     TOKEN_NUMBER,
@@ -388,45 +389,70 @@ char *node_to_string(Node* node) {
     return output;
 }
 
-Node* interp_binop(Node* node) {
-    // depth first
+Node* interp_binop_add(Node* node) {
+    Node* left = interp(node->left);
+    Node* right = interp(node->right);
+    if (left->type == NODE_INTEGER && right->type == NODE_INTEGER) {
+        return ast_integer(left->value_i32 + right->value_i32);
+    } else if (node_eq(left, right)) {
+        return ast_binop(ast_integer(2), left, OP_MUL);
+    } else if (left->type == NODE_INTEGER && right->type == NODE_BINOP && right->op_type == OP_DIV) {
+        // c + a/b
+        // -> (cb)/b + a/b
+        Node* r = ast_binop(ast_binop(ast_binop(left, right->right, OP_MUL), right->right, OP_DIV), right, OP_ADD);
+        return interp_binop(r);
+    } else if (left->type == NODE_BINOP && left->op_type == OP_MUL) {
+        if (node_eq(left->right, right)) {
+            Node* new_left = interp_binop(ast_binop(ast_integer(1), left->left, OP_ADD));
+            return ast_binop(new_left, right, OP_MUL);
+        }
+    }
+    return ast_binop(left, right, OP_ADD);
+}
+
+Node* interp_binop_sub(Node* node) {
+    Node* left = interp(node->left);
+    Node* right = interp(node->right);
+    if (left->type == NODE_INTEGER && right->type == NODE_INTEGER) {
+        return ast_integer(left->value_i32 - right->value_i32);
+    }
+    return ast_binop(left, right, OP_SUB);
+}
+
+Node* interp_binop_mul(Node* node) {
+    Node* left = interp(node->left);
+    Node* right = interp(node->right);
+    if (left->type == NODE_INTEGER && right->type == NODE_INTEGER) {
+        return ast_integer(left->value_i32 * right->value_i32);
+    }
+    return ast_binop(left, right, OP_MUL);
+}
+
+Node* interp_binop_div(Node* node) {
     Node* left = interp(node->left);
     Node* right = interp(node->right);
     OpType op_type = node->op_type;
-
     if (left->type == NODE_INTEGER && right->type == NODE_INTEGER) {
-        switch (op_type) {
-            case OP_ADD: return ast_integer(left->value_i32 + right->value_i32);
-            case OP_SUB: return ast_integer(left->value_i32 - right->value_i32);
-            case OP_MUL: return ast_integer(left->value_i32 * right->value_i32);
-            case OP_DIV: {
-                if (left->value_i32 % right->value_i32 == 0) {
-                    return ast_integer(left->value_i32 / right->value_i32);
-                } else {
-                    return ast_binop(left, right, op_type);
-                }
-            }
-            default: assert(false);
+        if (left->value_i32 % right->value_i32 == 0) {
+            return ast_integer(left->value_i32 / right->value_i32);
+        } else {
+            return ast_binop(left, right, op_type);
         }
     } else if (left->type == NODE_INTEGER && right->type == NODE_BINOP && right->op_type == OP_DIV) {
-        switch (op_type) {
-            case OP_ADD: {
-                // c + a/b
-                // -> (cb)/b + a/b
-                Node* r = ast_binop(ast_binop(ast_binop(left, right->right, OP_MUL), right->right, OP_DIV), right, OP_ADD);
-                return interp_binop(r);
-            }
-            case OP_SUB: assert(false);
-            case OP_MUL: {
-                Node* r = ast_binop(ast_binop(left, right->left, OP_MUL), right->right, OP_DIV);
-                return interp_binop(r);
-            }
-            case OP_DIV: assert(false);
-            default: assert(false);
-        }
+        Node* r = ast_binop(ast_binop(left, right->left, OP_MUL), right->right, OP_DIV);
+        return interp_binop(r);
     }
+    return ast_binop(left, right, OP_DIV);
+}
 
-    return ast_binop(left, right, op_type);
+Node* interp_binop(Node* node) {
+    switch (node->op_type) {
+        case OP_ADD: return interp_binop_add(node);
+        case OP_SUB: return interp_binop_sub(node);
+        case OP_MUL: return interp_binop_mul(node);
+        case OP_DIV: return interp_binop_div(node);
+        default: assert(false);
+    }
 }
 
 Node* interp_unaryop(Node* node) {
@@ -444,31 +470,15 @@ Node* interp_unaryop(Node* node) {
     return ast_unaryop(expr, op_type);
 }
 
-Node* interp(Node* node) {
-    switch (node->type) {
-        case NODE_BINOP:
-            return interp_binop(node);
-        case NODE_UNARYOP:
-            return interp_unaryop(node);
-        case NODE_INTEGER:
-            return node;
-        case NODE_FUNC: {
-            if (node->expr->type == NODE_INTEGER && node->func_type == FUNC_SQRT) {
-                double result = sqrt((double)node->expr->value_i32);
-                if (fmod((double)node->expr->value_i32, result) == 0.0) {
-                    return ast_integer((int)result);
-                }
-            }
-            return node;
+Node* interp_func(Node* node) {
+    Node* expr = interp(node->expr);
+    if (expr->type == NODE_INTEGER && node->func_type == FUNC_SQRT) {
+        double result = sqrt((double)node->expr->value_i32);
+        if (fmod((double)node->expr->value_i32, result) == 0.0) {
+            return ast_integer((int)result);
         }
-        default:
-            fprintf(stderr, "ERROR: Cannot interp node type '%s'\n", node_type_string_table[node->type]);
-            exit(1);
-    }
-}
 
-Node* simplify(Node* node) {
-    if (node->type == NODE_FUNC && node->func_type == FUNC_SQRT && node->expr->type == NODE_INTEGER) {
+        // check for perfect square
         // @Speed: this is probably an inefficient way to compute the biggest perfect sqaure factor of a given number
         for (int q = node->expr->value_i32; q > 1; q--) {
             double sqrt_of_q = sqrtf((double)q);
@@ -483,8 +493,25 @@ Node* simplify(Node* node) {
     return node;
 }
 
+Node* interp(Node* node) {
+    switch (node->type) {
+        case NODE_BINOP:
+            return interp_binop(node);
+        case NODE_UNARYOP:
+            return interp_unaryop(node);
+        case NODE_INTEGER:
+        case NODE_SYMBOL:
+            return node;
+        case NODE_FUNC:
+            return interp_func(node);
+        default:
+            fprintf(stderr, "ERROR: Cannot interp node type '%s'\n", node_type_string_table[node->type]);
+            exit(1);
+    }
+}
+
 void test() {
-    size_t test_id = 0;
+    size_t test_id = 1;
 
     #define TEST_SOURCE_TO_PARSE(source, test_case) {{ \
         Tokens tokens = tokenize(source); \
@@ -493,6 +520,9 @@ void test() {
         printf("test %02zu...........................", test_id);\
         if (!node_eq(ast, test_case)) {\
             printf("failed\n");\
+            printf("%s\n", node_to_string(ast));\
+            printf("!=\n");\
+            printf("%s\n", node_to_string(test_case));\
             exit(1); \
         } else { \
             printf("passed\n");\
@@ -508,22 +538,9 @@ void test() {
         printf("test %02zu...........................", test_id);\
         if (!node_eq(output, test_case)) {\
             printf("failed\n");\
-            exit(1); \
-        } else { \
-            printf("passed\n");\
-        }\
-        test_id++;\
-    }}
-
-    #define TEST_SOURCE_TO_SIMPLIFY(source, test_case) {{ \
-        Tokens tokens = tokenize(source); \
-        Parser parser = { .tokens = tokens, .pos=0 }; \
-        Node* ast = parse_expr(&parser); \
-        Node* output = interp(ast); \
-        Node* simpl_output = simplify(output); \
-        printf("test %02zu...........................", test_id);\
-        if (!node_eq(simpl_output, test_case)) {\
-            printf("failed\n");\
+            printf("%s\n", node_to_string(output));\
+            printf("!=\n");\
+            printf("%s\n", node_to_string(test_case));\
             exit(1); \
         } else { \
             printf("passed\n");\
@@ -551,7 +568,7 @@ void test() {
 
     // things from the sympy tutorial
     TEST_SOURCE_TO_PARSE("sqrt(3)", ast_func(FUNC_SQRT, ast_integer(3)));
-    TEST_SOURCE_TO_SIMPLIFY("sqrt(8)", ast_binop(ast_integer(2), ast_func(FUNC_SQRT, ast_integer(2)), OP_MUL));
+    TEST_SOURCE_TO_INTERP("sqrt(8)", ast_binop(ast_integer(2), ast_func(FUNC_SQRT, ast_integer(2)), OP_MUL));
 
     // misc
     TEST_SOURCE_TO_INTERP("sqrt(9)", ast_integer(3));
@@ -571,8 +588,9 @@ int main() {
     test();
 #endif
     
-    char *source = "sqrt(12)";
-    // char *source = "sqrt(9)";
+    char *source = "x+2y-x";
+    // char *source = "x+x+x";
+    // char *source = "x+x";
     Tokens tokens = tokenize(source);
     tokens_print(&tokens);
 
@@ -583,8 +601,4 @@ int main() {
     Node* output = interp(ast);
     printf("%s\n", node_to_debug_string(output));
     printf("%s\n", node_to_string(output));
-
-    Node* simpl_output = simplify(output);
-    printf("%s\n", node_to_debug_string(simpl_output));
-    printf("%s\n", node_to_string(simpl_output));
 }
