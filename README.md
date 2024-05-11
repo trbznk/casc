@@ -1,9 +1,12 @@
 # casc
 
-Computer algebra system in C
+Recursive descent parser for mathematical expressions in C
 
-## Notes
-- progress ruslanspivak part 8 [x]
+## Quick start
+
+```bash
+$ ./build.sh
+```
 
 ## Other CAS
 - Symbolica - https://symbolica.io

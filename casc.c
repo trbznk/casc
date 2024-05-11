@@ -588,9 +588,7 @@ int main() {
     test();
 #endif
     
-    char *source = "x+2y-x";
-    // char *source = "x+x+x";
-    // char *source = "x+x";
+    char *source = "2x+x";
     Tokens tokens = tokenize(source);
     tokens_print(&tokens);
 
