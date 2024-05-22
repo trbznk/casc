@@ -6,7 +6,10 @@
 #include <stdbool.h>
 #include <math.h>
 
+#include "raylib.h"
+
 #define FIXED_STRING_SIZE 32
+#define CELL_INPUT_BUFFER_SIZE 1024
 
 // forward declarations
 typedef struct Node Node;
@@ -584,33 +587,114 @@ void tokens_print(Tokens *tokens) {
 
 int main(int argc, char *argv[]) {
     bool do_test = false;
+    bool do_cli = true;
+    bool do_gui = false;
 
     for (int i = 0; i < argc; i++) {
         if (i == 0) {
             assert(!strcmp(argv[i], "./casc"));
         } else if (!strcmp(argv[i], "--test")) {
             do_test = true;
+        } else if (!strcmp(argv[i], "--gui")) {
+            do_gui = true;
+            do_cli = false;
         } else {
             fprintf(stderr, "ERROR: Parse wrong argument '%s'.\n", argv[i]);
             exit(1);
         }
         printf("'%s'\n", argv[i]);
     }
-
+    assert(do_cli != do_gui);
 
     if (do_test) {
         test();
     }
-    
-    char *source = "2x+x";
-    Tokens tokens = tokenize(source);
-    tokens_print(&tokens);
 
-    Parser parser = { .tokens = tokens, .pos=0 };
-    Node* ast = parse_expr(&parser);
-    printf("%s\n", node_to_string(ast));
+    if (do_cli) {
+        char *source = "2x+x";
+        Tokens tokens = tokenize(source);
+        tokens_print(&tokens);
 
-    Node* output = interp(ast);
-    printf("%s\n", node_to_debug_string(output));
-    printf("%s\n", node_to_string(output));
+        Parser parser = { .tokens = tokens, .pos=0 };
+        Node* ast = parse_expr(&parser);
+        printf("%s\n", node_to_string(ast));
+
+        Node* output = interp(ast);
+        printf("%s\n", node_to_debug_string(output));
+        printf("%s\n", node_to_string(output));
+    } else if (do_gui) {
+        const int SCREEN_WIDTH = 800;
+        const int SCREEN_HEIGHT = 450;
+        const int FONT_SIZE = 32;
+
+        char cell_input_buffer[CELL_INPUT_BUFFER_SIZE];
+        cell_input_buffer[0] = '\0';
+        int cursor_position = 0;
+        (void)cursor_position;
+
+        InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "casc");
+
+        SetTargetFPS(60);
+
+        while (!WindowShouldClose()) {
+            // Control
+            char c = GetCharPressed();
+            if (c != 0) {
+                assert(strlen(cell_input_buffer) + 1 < CELL_INPUT_BUFFER_SIZE);
+                memmove(
+                    &cell_input_buffer[cursor_position+1],
+                    &cell_input_buffer[cursor_position],
+                    strlen(cell_input_buffer)-cursor_position+1 // we need to add 1 here, because it's a null terminated string for now
+                );
+                cell_input_buffer[cursor_position] = c;
+                cursor_position++;
+            } else if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) {
+                if (cursor_position > 0) {
+                    // printf("before backspace: '%s'\n", cell_input_buffer);
+                    int idx_to_delete = cursor_position-1;
+                    memmove(
+                        &cell_input_buffer[idx_to_delete],
+                        &cell_input_buffer[idx_to_delete+1],
+                        strlen(cell_input_buffer)-cursor_position+1 // we need to add 1 here, because it's a null terminated string for now
+                    );
+                    // printf("after backspace: '%s'\n", cell_input_buffer);
+                    cursor_position--;
+                }
+            } else if (IsKeyPressed(KEY_LEFT)) {
+                if (cursor_position > 0) {
+                    cursor_position--;
+                }
+            } else if (IsKeyPressed(KEY_RIGHT)) {
+                if (cursor_position < (int)strlen(cell_input_buffer)) {
+                    cursor_position++;
+                }
+            }
+
+            // Draw
+            BeginDrawing();
+                ClearBackground(WHITE);
+                DrawText(cell_input_buffer, 10, 10, FONT_SIZE, BLACK);
+                {
+                    char slice[CELL_INPUT_BUFFER_SIZE];
+                    for (int i = 0; i < cursor_position; i++) {
+                        slice[i] = cell_input_buffer[i];
+                    }
+                    slice[cursor_position] = '\0';
+                    int cell_input_buffer_text_width = MeasureText(slice, FONT_SIZE);
+                    int start_pos_x = 10 + cell_input_buffer_text_width;
+                    int start_pos_y = 10;
+                    int end_pos_x   = start_pos_x;
+                    int end_pos_y   = 10+FONT_SIZE;
+                    DrawLine(start_pos_x, start_pos_y, end_pos_x, end_pos_y, BLACK);
+                }
+            EndDrawing();
+        }
+
+        CloseWindow();
+    } else {
+        assert(false);
+        // unreachable
+    }
+
+    return 0;
 }
