@@ -582,11 +582,25 @@ void tokens_print(Tokens *tokens) {
     printf("\n");
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    bool do_test = false;
 
-#if 1
-    test();
-#endif
+    for (int i = 0; i < argc; i++) {
+        if (i == 0) {
+            assert(!strcmp(argv[i], "./casc"));
+        } else if (!strcmp(argv[i], "--test")) {
+            do_test = true;
+        } else {
+            fprintf(stderr, "ERROR: Parse wrong argument '%s'.\n", argv[i]);
+            exit(1);
+        }
+        printf("'%s'\n", argv[i]);
+    }
+
+
+    if (do_test) {
+        test();
+    }
     
     char *source = "2x+x";
     Tokens tokens = tokenize(source);
