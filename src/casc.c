@@ -6,8 +6,6 @@
 #include <stdbool.h>
 #include <math.h>
 
-#include "casc.h"
-
 #define FIXED_STRING_SIZE 32
 
 // forward declarations
@@ -582,4 +580,23 @@ void tokens_print(Tokens *tokens) {
         printf("%s('%s') ", token_type_string_table[token->type], token->text);
     }
     printf("\n");
+}
+
+int main() {
+
+#if 1
+    test();
+#endif
+    
+    char *source = "2x+x";
+    Tokens tokens = tokenize(source);
+    tokens_print(&tokens);
+
+    Parser parser = { .tokens = tokens, .pos=0 };
+    Node* ast = parse_expr(&parser);
+    printf("%s\n", node_to_string(ast));
+
+    Node* output = interp(ast);
+    printf("%s\n", node_to_debug_string(output));
+    printf("%s\n", node_to_string(output));
 }
