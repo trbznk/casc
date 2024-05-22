@@ -10,6 +10,7 @@
 
 #define FIXED_STRING_SIZE 32
 #define CELL_INPUT_BUFFER_SIZE 1024
+#define CELL_OUTPUT_BUFFER_SIZE 1024
 
 // forward declarations
 typedef struct Node Node;
@@ -101,6 +102,9 @@ typedef enum {
     NODE_UNARYOP,
     NODE_FUNC,
 
+    // TODO: remove NODE_EMPTY type when there are more high level nodes like NODE_PROGRAMM or something similar
+    NODE_EMPTY,
+
     NODE_TYPE_COUNT
 } NodeType;
 
@@ -109,7 +113,8 @@ static const char *node_type_string_table[] = {
     "Symbol",
     "BinOp",
     "UnaryOp",
-    "Func"
+    "Func",
+    "Empty"
 };
 _Static_assert(sizeof(node_type_string_table)/sizeof(node_type_string_table[0]) == NODE_TYPE_COUNT, "");
 
@@ -279,6 +284,12 @@ Node* ast_func(FuncType func_type, Node* expr) {
     return node;
 }
 
+Node* ast_empty() {
+    Node* node = malloc(sizeof(Node));
+    node->type = NODE_EMPTY;
+    return node;
+}
+
 bool node_eq(Node* left, Node* right) {
     if (left->type == right->type) {
         switch (left->type) {
@@ -323,6 +334,9 @@ Node* parse_factor(Parser* parser) {
     } else if (current_token.type == TOKEN_PLUS) {
         parser_expect(parser, TOKEN_PLUS);
         return ast_unaryop(parse_factor(parser), OP_UADD);
+    } else if (current_token.type == TOKEN_EOF) {
+        // I think we can ignore EOF token for now and simply return it
+        return ast_empty();
     } else {
         assert(false);
     }
@@ -371,12 +385,15 @@ char *node_to_debug_string(Node* node) {
         case NODE_BINOP: sprintf(output, "%s(%s, %s)", op_type_string_table[node->op_type], node_to_debug_string(node->left), node_to_debug_string(node->right)); break;
         case NODE_UNARYOP: sprintf(output, "%s(%s)", op_type_string_table[node->op_type], node_to_debug_string(node->expr)); break;
         case NODE_FUNC: sprintf(output, "%s(%s)", func_type_string_table[node->func_type], node_to_debug_string(node->expr)); break;
+        case NODE_EMPTY: sprintf(output, "Empty()"); break;
         default: fprintf(stderr, "ERROR: Cannot do 'node_to_debug_string' because node type '%s' is not implemented.\n", node_type_string_table[node->type]); exit(1);
     }
     return output;
 }
 
 char *node_to_string(Node* node) {
+    // TODO: find a better solution to recursively build a string
+    //       same goes for node_to_debug_string function
     char *output = malloc(1024);
     switch (node->type) {
         case NODE_INTEGER: sprintf(output, "%d", node->value_i32); break;
@@ -387,7 +404,8 @@ char *node_to_string(Node* node) {
         }
         case NODE_UNARYOP: sprintf(output, "%c%s", op_type_char_table[node->op_type], node_to_string(node->expr)); break;
         case NODE_FUNC: sprintf(output, "%s(%s)", func_type_string_table[node->func_type], node_to_string(node->expr)); break;
-        default: fprintf(stderr, "ERROR: Cannot do 'node_to_debug_string' because node type '%s' is not implemented.\n", node_type_string_table[node->type]); exit(1);
+        case NODE_EMPTY: break;
+        default: fprintf(stderr, "ERROR: Cannot do 'node_to_string' because node type '%s' is not implemented.\n", node_type_string_table[node->type]); exit(1);
     }
     return output;
 }
@@ -507,6 +525,8 @@ Node* interp(Node* node) {
             return node;
         case NODE_FUNC:
             return interp_func(node);
+        case NODE_EMPTY:
+            return node;
         default:
             fprintf(stderr, "ERROR: Cannot interp node type '%s'\n", node_type_string_table[node->type]);
             exit(1);
@@ -611,7 +631,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (do_cli) {
-        char *source = "2x+x";
+
+        char *source = "";
         Tokens tokens = tokenize(source);
         tokens_print(&tokens);
 
@@ -622,12 +643,15 @@ int main(int argc, char *argv[]) {
         Node* output = interp(ast);
         printf("%s\n", node_to_debug_string(output));
         printf("%s\n", node_to_string(output));
+
     } else if (do_gui) {
         const int SCREEN_WIDTH = 800;
         const int SCREEN_HEIGHT = 450;
         const int FONT_SIZE = 32;
 
         char cell_input_buffer[CELL_INPUT_BUFFER_SIZE];
+        char *cell_output_buffer = NULL;
+        (void)cell_output_buffer;
         cell_input_buffer[0] = '\0';
         int cursor_position = 0;
         (void)cursor_position;
@@ -637,6 +661,7 @@ int main(int argc, char *argv[]) {
         SetTargetFPS(60);
 
         while (!WindowShouldClose()) {
+
             // Control
             char c = GetCharPressed();
             if (c != 0) {
@@ -650,14 +675,12 @@ int main(int argc, char *argv[]) {
                 cursor_position++;
             } else if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) {
                 if (cursor_position > 0) {
-                    // printf("before backspace: '%s'\n", cell_input_buffer);
                     int idx_to_delete = cursor_position-1;
                     memmove(
                         &cell_input_buffer[idx_to_delete],
                         &cell_input_buffer[idx_to_delete+1],
                         strlen(cell_input_buffer)-cursor_position+1 // we need to add 1 here, because it's a null terminated string for now
                     );
-                    // printf("after backspace: '%s'\n", cell_input_buffer);
                     cursor_position--;
                 }
             } else if (IsKeyPressed(KEY_LEFT)) {
@@ -668,6 +691,12 @@ int main(int argc, char *argv[]) {
                 if (cursor_position < (int)strlen(cell_input_buffer)) {
                     cursor_position++;
                 }
+            } else if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_ENTER)) {
+                Tokens tokens = tokenize(cell_input_buffer);
+                Parser parser = { .tokens = tokens, .pos=0 };
+                Node* ast = parse_expr(&parser);
+                Node* output = interp(ast);
+                cell_output_buffer = node_to_string(output);
             }
 
             // Draw
@@ -686,6 +715,10 @@ int main(int argc, char *argv[]) {
                     int end_pos_x   = start_pos_x;
                     int end_pos_y   = 10+FONT_SIZE;
                     DrawLine(start_pos_x, start_pos_y, end_pos_x, end_pos_y, BLACK);
+                }
+                DrawLine(0, 2*10+FONT_SIZE, SCREEN_WIDTH, 2*10+FONT_SIZE, GRAY);
+                if (cell_output_buffer != NULL) {
+                    DrawText(cell_output_buffer, 10, 2*10+FONT_SIZE+10, FONT_SIZE, BLACK);
                 }
             EndDrawing();
         }
