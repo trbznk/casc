@@ -5,4 +5,4 @@ CFLAGS="-Isrc -Wall -Wextra -Werror -std=c11"
 RAYFLAGS="-Ithirdparty/raylib -framework CoreVideo -framework IOKit -framework Cocoa -framework GLUT -framework OpenGL"
 # -Lthirdparty/raylib
 
-$CC $CFLAGS $RAYFLAGS -o casc ./thirdparty/raylib/libraylib.a ./src/casc.c
+$CC $CFLAGS $RAYFLAGS -o casc ./thirdparty/raylib/libraylib.a ./src/*.c
