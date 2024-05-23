@@ -8,11 +8,7 @@
 
 #include "parser.h"
 #include "interp.h"
-
-#include "raylib.h"
-
-#define CELL_INPUT_BUFFER_SIZE 1024
-#define CELL_OUTPUT_BUFFER_SIZE 1024
+#include "gui.h"
 
 void test() {
     size_t test_id = 1;
@@ -110,85 +106,7 @@ int main(int argc, char *argv[]) {
         printf("r=%d\n", r);
         
     } else if (do_gui) {
-        // Editor
-        const int SCREEN_WIDTH = 800;
-        const int SCREEN_HEIGHT = 450;
-        const int FONT_SIZE = 32;
-        char cell_input_buffer[CELL_INPUT_BUFFER_SIZE];
-        char *cell_output_buffer = NULL;
-        (void)cell_output_buffer;
-        cell_input_buffer[0] = '\0';
-        int cursor_position = 0;
-        (void)cursor_position;
-
-        InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "casc");
-
-        SetTargetFPS(60);
-
-        while (!WindowShouldClose()) {
-
-            // Control
-            char c = GetCharPressed();
-            if (c != 0) {
-                assert(strlen(cell_input_buffer) + 1 < CELL_INPUT_BUFFER_SIZE);
-                memmove(
-                    &cell_input_buffer[cursor_position+1],
-                    &cell_input_buffer[cursor_position],
-                    strlen(cell_input_buffer)-cursor_position+1 // we need to add 1 here, because it's a null terminated string for now
-                );
-                cell_input_buffer[cursor_position] = c;
-                cursor_position++;
-            } else if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) {
-                if (cursor_position > 0) {
-                    int idx_to_delete = cursor_position-1;
-                    memmove(
-                        &cell_input_buffer[idx_to_delete],
-                        &cell_input_buffer[idx_to_delete+1],
-                        strlen(cell_input_buffer)-cursor_position+1 // we need to add 1 here, because it's a null terminated string for now
-                    );
-                    cursor_position--;
-                }
-            } else if (IsKeyPressed(KEY_LEFT)) {
-                if (cursor_position > 0) {
-                    cursor_position--;
-                }
-            } else if (IsKeyPressed(KEY_RIGHT)) {
-                if (cursor_position < (int)strlen(cell_input_buffer)) {
-                    cursor_position++;
-                }
-            } else if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_ENTER)) {
-                Tokens tokens = tokenize(cell_input_buffer);
-                Parser parser = { .tokens = tokens, .pos=0 };
-                AST* ast = parse_expr(&parser);
-                AST* output = interp(ast);
-                cell_output_buffer = ast_to_string(output);
-            }
-
-            // Draw
-            BeginDrawing();
-                ClearBackground(WHITE);
-                DrawText(cell_input_buffer, 10, 10, FONT_SIZE, BLACK);
-                {
-                    char slice[CELL_INPUT_BUFFER_SIZE];
-                    for (int i = 0; i < cursor_position; i++) {
-                        slice[i] = cell_input_buffer[i];
-                    }
-                    slice[cursor_position] = '\0';
-                    int cell_input_buffer_text_width = MeasureText(slice, FONT_SIZE);
-                    int start_pos_x = 10 + cell_input_buffer_text_width;
-                    int start_pos_y = 10;
-                    int end_pos_x   = start_pos_x;
-                    int end_pos_y   = 10+FONT_SIZE;
-                    DrawLine(start_pos_x, start_pos_y, end_pos_x, end_pos_y, BLACK);
-                }
-                DrawLine(0, 2*10+FONT_SIZE, SCREEN_WIDTH, 2*10+FONT_SIZE, GRAY);
-                if (cell_output_buffer != NULL) {
-                    DrawText(cell_output_buffer, 10, 2*10+FONT_SIZE+10, FONT_SIZE, BLACK);
-                }
-            EndDrawing();
-        }
-
-        CloseWindow();
+        init_gui();
     } else {
         assert(false);
         // unreachable

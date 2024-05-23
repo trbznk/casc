@@ -43,7 +43,7 @@ char *ast_to_debug_string(AST* node) {
         case AST_INTEGER: sprintf(output, "%s(%lld)", ast_type_to_debug_string(node->type), node->integer.value); break;
         case AST_SYMBOL: sprintf(output, "%s(%s)", ast_type_to_debug_string(node->type), node->symbol.name.text); break;
         case AST_BINOP: sprintf(output, "%s(%s, %s)", op_type_to_debug_string(node->binop.type), ast_to_debug_string(node->binop.left), ast_to_debug_string(node->binop.right)); break;
-        case AST_UNARYOP: sprintf(output, "%s(%s)", op_type_to_debug_string(node->unary_op.type), ast_to_debug_string(node->unary_op.expr)); break;
+        case AST_UNARYOP: sprintf(output, "%s(%s)", op_type_to_debug_string(node->unaryop.type), ast_to_debug_string(node->unaryop.expr)); break;
         case AST_FUNC_CALL: sprintf(output, "%s(%s)", node->func_call.name.text, ast_to_debug_string(node->func_call.arg)); break;
         case AST_EMPTY: sprintf(output, "Empty()"); break;
         default: fprintf(stderr, "ERROR: Cannot do 'ast_to_debug_string' because node type '%s' is not implemented.\n", ast_type_to_debug_string(node->type)); exit(1);
@@ -62,7 +62,7 @@ char *ast_to_string(AST* node) {
             sprintf(output, "(%s%s%s)", ast_to_string(node->binop.left), op_type_to_string(node->binop.type), ast_to_string(node->binop.right));
             break;
         }
-        case AST_UNARYOP: sprintf(output, "%s%s", op_type_to_string(node->unary_op.type), ast_to_string(node->unary_op.expr)); break;
+        case AST_UNARYOP: sprintf(output, "%s%s", op_type_to_string(node->unaryop.type), ast_to_string(node->unaryop.expr)); break;
         case AST_FUNC_CALL: sprintf(output, "%s(%s)", node->func_call.name.text, ast_to_string(node->func_call.arg)); break;
         case AST_EMPTY: break;
         default: fprintf(stderr, "ERROR: Cannot do 'ast_to_string' because node type '%s' is not implemented.\n", ast_type_to_debug_string(node->type)); exit(1);
@@ -137,8 +137,8 @@ AST* interp_binop(AST* node) {
 }
 
 AST* interp_unaryop(AST* node) {
-    AST* expr = interp(node->unary_op.expr);
-    OpType op_type = node->unary_op.type;
+    AST* expr = interp(node->unaryop.expr);
+    OpType op_type = node->unaryop.type;
 
     if (expr->type == AST_INTEGER) {
         switch (op_type) {
@@ -151,7 +151,7 @@ AST* interp_unaryop(AST* node) {
     return create_ast_unaryop(expr, op_type);
 }
 
-AST* interp_func(AST* node) {
+AST* interp_func_call(AST* node) {
     AST* arg = interp(node->func_call.arg);
     if (arg->type == AST_INTEGER && !strcmp(node->func_call.name.text, "sqrt")) {
         double result = sqrt((double)node->func_call.arg->integer.value);
@@ -185,7 +185,7 @@ AST* interp(AST* node) {
         case AST_SYMBOL:
             return node;
         case AST_FUNC_CALL:
-            return interp_func(node);
+            return interp_func_call(node);
         case AST_EMPTY:
             return node;
         default:

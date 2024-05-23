@@ -71,7 +71,7 @@ struct AST {
         ASTInteger integer;
         ASTSymbol symbol;
         ASTBinOp binop;
-        ASTUnaryOp unary_op;
+        ASTUnaryOp unaryop;
         ASTFuncCall func_call;
         bool empty; // temporary for ASTType empty
     };

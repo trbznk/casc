@@ -38,7 +38,7 @@ AST* create_ast_binop(AST* left, AST* right, OpType type) {
 AST* create_ast_unaryop(AST* expr, OpType type) {
     AST* node = malloc(sizeof(AST));
     node->type = AST_UNARYOP;
-    node->unary_op = (ASTUnaryOp){ .expr=expr, .type=type };
+    node->unaryop = (ASTUnaryOp){ .expr=expr, .type=type };
     return node;
 }
 
