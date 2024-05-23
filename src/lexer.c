@@ -44,15 +44,15 @@ Tokens tokenize(char* source) {
             i--;
         } else if (isalpha(source[i])) {
             // maybe we need this code again when introducing identifier for function calls e.g. sin(2)
-            char number_buffer[FIXED_STRING_SIZE] = "";
+            char buffer[FIXED_STRING_SIZE] = "";
             size_t first = i;
             while (isalpha(source[i]) || (i > first && (isalpha(source[i]) || isdigit(source[i])))) {
-                strncat(number_buffer, &source[i], 1);
+                strncat(buffer, &source[i], 1);
                 i++;
             }
-            if (!strcmp(number_buffer, "sqrt")) {
+            if (!strcmp(buffer, "sqrt") || !strcmp(buffer, "sin") || !strcmp(buffer, "cos") || !strcmp(buffer, "pi")) {
                 Token token = { .type = TOKEN_IDENTIFIER };
-                strcpy(token.text, number_buffer);
+                strcpy(token.text, buffer);
                 tokens_append(&tokens, token);
                 i--;
             } else {
@@ -61,8 +61,6 @@ Tokens tokenize(char* source) {
                 strncpy(token.text, &source[i], 1);
                 tokens_append(&tokens, token);
             }
-
-
         } else if (source[i] == '+') {
             Token token = { .type = TOKEN_PLUS };
             strncpy(token.text, &source[i], 1);

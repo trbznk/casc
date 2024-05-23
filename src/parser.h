@@ -10,6 +10,7 @@ typedef struct Parser Parser;
 typedef struct AST AST;
 typedef struct ASTInteger ASTInteger;
 typedef struct ASTSymbol ASTSymbol;
+typedef struct ASTConstant ASTConstant;
 typedef struct ASTBinOp ASTBinOp;
 typedef struct ASTUnaryOp ASTUnaryOp;
 typedef struct ASTFuncCall ASTFuncCall;
@@ -29,6 +30,7 @@ typedef enum {
 typedef enum {
     AST_INTEGER,
     AST_SYMBOL,
+    AST_CONSTANT,
     AST_BINOP,
     AST_UNARYOP,
 
@@ -46,6 +48,10 @@ struct ASTInteger {
 };
 
 struct ASTSymbol {
+    Token name;
+};
+
+struct ASTConstant {
     Token name;
 };
 
@@ -70,6 +76,7 @@ struct AST {
     union {
         ASTInteger integer;
         ASTSymbol symbol;
+        ASTConstant constant;
         ASTBinOp binop;
         ASTUnaryOp unaryop;
         ASTFuncCall func_call;
@@ -84,6 +91,7 @@ struct Parser {
 
 AST* create_ast_integer(int64_t);
 AST* create_ast_symbol(Token);
+AST* create_ast_constant(Token);
 AST* create_ast_binop(AST*, AST*, OpType);
 AST* create_ast_unaryop(AST*, OpType);
 AST* create_ast_func_call(Token, AST*);

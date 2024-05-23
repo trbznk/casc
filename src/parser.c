@@ -28,6 +28,13 @@ AST* create_ast_symbol(Token name) {
     return node;
 }
 
+AST* create_ast_constant(Token name) {
+    AST *node = malloc(sizeof(AST));
+    node->type = AST_CONSTANT;
+    node->constant = (ASTConstant){ .name=name };
+    return node;
+}
+
 AST* create_ast_binop(AST* left, AST* right, OpType type) {
     AST *node = malloc(sizeof(AST));
     node->type = AST_BINOP;
@@ -62,12 +69,15 @@ AST* parse_factor(Parser* parser) {
         parser_expect(parser, TOKEN_NUMBER);
         return create_ast_integer(atoi(current_token.text));
     } else if (current_token.type == TOKEN_IDENTIFIER) {
-        if (!strcmp(current_token.text, "sqrt")) {
+        if (!strcmp(current_token.text, "sqrt") || !strcmp(current_token.text, "sin") || !strcmp(current_token.text, "cos")) {
             parser_expect(parser, TOKEN_IDENTIFIER);
             parser_expect(parser, TOKEN_L_PAREN);
             AST* body = parse_expr(parser);
             parser_expect(parser, TOKEN_R_PAREN);
             return create_ast_func_call(current_token, body);
+        } else if (!strcmp(current_token.text, "pi")) {
+            parser_expect(parser, TOKEN_IDENTIFIER);
+            return create_ast_constant(current_token);
         } else {
             parser_expect(parser, TOKEN_IDENTIFIER);
             return create_ast_symbol(current_token);
@@ -160,6 +170,7 @@ const char* ast_type_to_debug_string(ASTType type) {
     switch (type) {
         case AST_INTEGER: return "Integer";
         case AST_SYMBOL: return "Symbol";
+        case AST_CONSTANT: return "Constant";
         case AST_BINOP: return "BinOp";
         case AST_UNARYOP: return "UnaryOp";
         case AST_FUNC_CALL: return "FuncCall";

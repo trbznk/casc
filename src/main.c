@@ -72,6 +72,7 @@ void test() {
 
     // misc
     TEST_SOURCE_TO_INTERP("sqrt(9)", create_ast_integer(3));
+    TEST_SOURCE_TO_INTERP("1/3 * sin(pi) - cos(pi/2) / cos(pi) + 54/2 * sqrt(9)", create_ast_integer(81));
 }
 
 int main(int argc, char *argv[]) {
@@ -91,7 +92,6 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "ERROR: Parse wrong argument '%s'.\n", argv[i]);
             exit(1);
         }
-        printf("'%s'\n", argv[i]);
     }
     assert(do_cli != do_gui);
 
@@ -101,9 +101,11 @@ int main(int argc, char *argv[]) {
 
     if (do_cli) {
         // ast_match_type()
-        AST* output = interp_from_string("3/2 + 5/2");
-        bool r = ast_match_type(output, parse_from_string("1/1 + 1/1"));
-        printf("r=%d\n", r);
+        AST* output = interp_from_string("1/3 * sin(pi) - cos(pi/2) / cos(pi) + 54/2 * sqrt(9)"); // = 81 (desmos)
+        printf("%s\n", ast_to_string(output));
+        printf("%s\n", ast_to_debug_string(output));
+        // bool r = ast_match_type(output, parse_from_string("1/1 + 1/1"));
+        // printf("r=%d\n", r);
         
     } else if (do_gui) {
         init_gui();
