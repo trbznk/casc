@@ -3,13 +3,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include <stdbool.h>
 
 #include "lexer.h"
 
 void tokens_print(Tokens *tokens) {
     for (size_t i = 0; i < tokens->size; i++) {
         Token *token = &tokens->data[i];
-        printf("%s('%s') ", token_type_string_table[token->type], token->text);
+        printf("%s('%s') ", token_type_to_string(token->type), token->text);
     }
     printf("\n");
 }
@@ -100,4 +101,20 @@ Tokens tokenize(char* source) {
     assert(i == strlen(source));
     tokens_append(&tokens, (Token){ .type=TOKEN_EOF });
     return tokens;
+}
+
+const char *token_type_to_string(TokenType type) {
+    switch (type) {
+        case TOKEN_NUMBER: return "NUMBER";
+        case TOKEN_IDENTIFIER: return "IDENTIFIER";
+        case TOKEN_PLUS: return "PLUS";
+        case TOKEN_MINUS: return "MINUS";
+        case TOKEN_STAR: return "STAR";
+        case TOKEN_SLASH: return "SLASH";
+        case TOKEN_CARET: return "CARET";
+        case TOKEN_L_PAREN: return "L_PAREN";
+        case TOKEN_R_PAREN: return "R_PAREN";
+        case TOKEN_EOF: return "EOF";
+        default: assert(false);
+    }
 }

@@ -10,7 +10,7 @@ void parser_expect(Parser* parser, TokenType type) {
     if (parser->tokens.data[parser->pos].type == type) {
         parser->pos++;
     } else {
-        fprintf(stderr, "ERROR: Expected %s got %s.", token_type_string_table[type], token_type_string_table[parser->tokens.data[parser->pos].type]);
+        fprintf(stderr, "ERROR: Expected %s got %s.", token_type_to_string(type), token_type_to_string(parser->tokens.data[parser->pos].type));
     }
 }   
 
@@ -63,7 +63,7 @@ AST* create_ast_empty() {
     return node;
 }
 
-AST* parse_factor(Parser* parser) {
+AST *parse_exp(Parser* parser) {
     Token current_token = parser->tokens.data[parser->pos];
     if (current_token.type == TOKEN_NUMBER) {
         parser_expect(parser, TOKEN_NUMBER);
@@ -101,6 +101,21 @@ AST* parse_factor(Parser* parser) {
     }
 }
 
+AST *parse_factor(Parser *parser) {
+    AST* result = parse_exp(parser);
+
+     while (parser->tokens.data[parser->pos].type == TOKEN_CARET) {
+        parser_expect(parser, TOKEN_CARET);
+        // when we use the same hierachy pattern like in parse_term or parse_expr, we need to call
+        // parse_expr here. But unlike with addition and multiplication we want to parse pow operation
+        // from right to left (this is more common, e.g. desmos, python, ...). 
+        // For now I dont know if there are any edge cases, where this implementation is wrong.
+        result = create_ast_binop(result, parse_factor(parser), OP_POW);
+    }
+
+    return result;
+}
+
 AST* parse_term(Parser* parser) {
     AST* result = parse_factor(parser);
 
@@ -135,10 +150,16 @@ AST* parse_expr(Parser* parser) {
     return result;
 }
 
+AST* parse(Parser *parser) {
+    AST* result = parse_expr(parser);
+    assert(parser->tokens.data[parser->pos].type == TOKEN_EOF);
+    return result;
+}
+
 AST* parse_from_string(char* input) {
     Tokens tokens = tokenize(input);
     Parser parser = { .tokens = tokens, .pos=0 };
-    AST* ast = parse_expr(&parser);
+    AST* ast = parse(&parser);
     return ast;
 }
 
@@ -148,6 +169,7 @@ const char* op_type_to_debug_string(OpType type) {
         case OP_SUB: return "Sub";
         case OP_MUL: return "Mul";
         case OP_DIV: return "Div";
+        case OP_POW: return "Pow";
         case OP_UADD: return "UAdd";
         case OP_USUB: return "USub";
         default: assert(false);
@@ -162,6 +184,7 @@ const char* op_type_to_string(OpType type) {
         case OP_USUB: return "-";
         case OP_MUL: return "*";
         case OP_DIV: return "/";
+        case OP_POW: return "^";
         default: assert(false);
     }
 }

@@ -33,7 +33,7 @@ void test() {
     #define TEST_SOURCE_TO_INTERP(source, test_case) {{ \
         Tokens tokens = tokenize(source); \
         Parser parser = { .tokens = tokens, .pos=0 }; \
-        AST* ast = parse_expr(&parser); \
+        AST* ast = parse(&parser); \
         AST* output = interp(ast); \
         printf("test %02zu...........................", test_id);\
         if (!ast_match(output, test_case)) {\
@@ -73,6 +73,15 @@ void test() {
     // misc
     TEST_SOURCE_TO_INTERP("sqrt(9)", create_ast_integer(3));
     TEST_SOURCE_TO_INTERP("1/3 * sin(pi) - cos(pi/2) / cos(pi) + 54/2 * sqrt(9)", create_ast_integer(81));
+    TEST_SOURCE_TO_INTERP("3^2^3", create_ast_integer(6561));
+    TEST_SOURCE_TO_INTERP("3^(2^3)", create_ast_integer(6561));
+    TEST_SOURCE_TO_INTERP("(3^2)^3", create_ast_integer(729));
+    TEST_SOURCE_TO_INTERP("3^4 - (-100)^2", create_ast_integer(-9919));
+    TEST_SOURCE_TO_INTERP("-3^2", create_ast_integer(-9));
+    TEST_SOURCE_TO_INTERP("(-3)^2", create_ast_integer(9));
+    TEST_SOURCE_TO_INTERP("-2*-3", create_ast_integer(6));
+    TEST_SOURCE_TO_INTERP("2*-3", create_ast_integer(-6));
+    TEST_SOURCE_TO_INTERP("cos(pi)^2+1", create_ast_integer(2));
 }
 
 int main(int argc, char *argv[]) {
@@ -101,7 +110,12 @@ int main(int argc, char *argv[]) {
 
     if (do_cli) {
         // ast_match_type()
-        AST* output = interp_from_string("1/3 * sin(pi) - cos(pi/2) / cos(pi) + 54/2 * sqrt(9)"); // = 81 (desmos)
+        // char* input = "7 + 3 * (10 / (12 / (3 + 1) - 1))";
+        char* input = "(-3)^2";
+        Tokens tokens = tokenize(input);
+        tokens_print(&tokens);
+
+        AST* output = interp_from_string(input);
         printf("%s\n", ast_to_string(output));
         printf("%s\n", ast_to_debug_string(output));
         // bool r = ast_match_type(output, parse_from_string("1/1 + 1/1"));

@@ -144,12 +144,11 @@ AST* interp_binop_mul(AST* node) {
 AST* interp_binop_div(AST* node) {
     AST* left = interp(node->binop.left);
     AST* right = interp(node->binop.right);
-    OpType op_type = node->binop.type;
     if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
         if (left->integer.value % right->integer.value == 0) {
             return create_ast_integer(left->integer.value / right->integer.value);
         } else {
-            return create_ast_binop(left, right, op_type);
+            return create_ast_binop(left, right, OP_DIV);
         }
     } else if (left->type == AST_INTEGER && right->type == AST_BINOP && right->binop.type == OP_DIV) {
         AST* r = create_ast_binop(create_ast_binop(left, right->binop.left, OP_MUL), right->binop.right, OP_DIV);
@@ -158,12 +157,25 @@ AST* interp_binop_div(AST* node) {
     return create_ast_binop(left, right, OP_DIV);
 }
 
+AST *interp_binop_pow(AST *node) {
+    AST* left = interp(node->binop.left);
+    AST* right = interp(node->binop.right);
+    if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
+        long double l = (long double)left->integer.value;
+        long double r = (long double)right->integer.value;
+        int64_t result = (int64_t)powl(l, r);
+        return create_ast_integer(result);
+    }
+    return create_ast_binop(left, right, OP_POW);
+}
+
 AST* interp_binop(AST* node) {
     switch (node->binop.type) {
         case OP_ADD: return interp_binop_add(node);
         case OP_SUB: return interp_binop_sub(node);
         case OP_MUL: return interp_binop_mul(node);
         case OP_DIV: return interp_binop_div(node);
+        case OP_POW: return interp_binop_pow(node);
         default: assert(false);
     }
 }
@@ -239,7 +251,7 @@ AST* interp(AST* node) {
 AST* interp_from_string(char* input) {
     Tokens tokens = tokenize(input);
     Parser parser = { .tokens = tokens, .pos=0 };
-    AST* ast = parse_expr(&parser);
+    AST* ast = parse(&parser);
     AST* output = interp(ast);
     return output;
 }

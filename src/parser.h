@@ -20,6 +20,7 @@ typedef enum {
     OP_SUB,
     OP_MUL,
     OP_DIV,
+    OP_POW,
 
     OP_UADD,
     OP_USUB,
@@ -97,7 +98,9 @@ AST* create_ast_unaryop(AST*, OpType);
 AST* create_ast_func_call(Token, AST*);
 AST* create_ast_empty();
 
+AST* parse(Parser*);
 AST* parse_expr(Parser*);
+AST* parse_factor(Parser*);
 AST* parse_from_string(char*);
 
 const char* op_type_to_debug_string(OpType);

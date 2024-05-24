@@ -20,20 +20,6 @@ typedef enum {
     TOKEN_TYPE_COUNT
 } TokenType;
 
-static const char *token_type_string_table[] = {
-    "NUMBER",
-    "IDENTIFIER",
-    "PLUS",
-    "MINUS",
-    "STAR",
-    "SLASH",
-    "CARET",
-    "L_PAREN",
-    "R_PAREN",
-    "EOF"
-};
-_Static_assert(sizeof(token_type_string_table)/sizeof(token_type_string_table[0]) == TOKEN_TYPE_COUNT, "");
-
 typedef struct {
     TokenType type;
 
@@ -51,7 +37,7 @@ typedef struct {
 } Tokens;
 
 Tokens tokenize(char*);
-
-
+void tokens_print(Tokens*);
+const char* token_type_to_string(TokenType);
 
 #endif
