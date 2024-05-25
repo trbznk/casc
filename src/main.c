@@ -82,6 +82,9 @@ void test() {
     TEST_SOURCE_TO_INTERP("-2*-3", create_ast_integer(6));
     TEST_SOURCE_TO_INTERP("2*-3", create_ast_integer(-6));
     TEST_SOURCE_TO_INTERP("cos(pi)^2+1", create_ast_integer(2));
+    TEST_SOURCE_TO_INTERP("x^0", create_ast_integer(1));
+    TEST_SOURCE_TO_INTERP("x^1", parse_from_string("x"));
+    TEST_SOURCE_TO_INTERP("1/8 * (-4-2*4/3-1)", interp_from_string("-23/24"));
 
     // auto generated
     TEST_SOURCE_TO_INTERP("48+-75", create_ast_integer(-27));
@@ -167,13 +170,15 @@ int main(int argc, char *argv[]) {
     if (do_cli) {
         // ast_match_type()
         // char* input = "7 + 3 * (10 / (12 / (3 + 1) - 1))";
-        char* input = "(-3)^2";
+        char* input = "1/8 * (-4-2*4/3-1)"; // -23/24
+        // char* input = "-4-8/3";
         Tokens tokens = tokenize(input);
         tokens_print(&tokens);
 
         AST* output = interp_from_string(input);
         printf("%s\n", ast_to_string(output));
         printf("%s\n", ast_to_debug_string(output));
+        printf("%s\n", ast_to_debug_string(interp_from_string("-23/24")));
         // bool r = ast_match_type(output, parse_from_string("1/1 + 1/1"));
         // printf("r=%d\n", r);
         

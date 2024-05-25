@@ -126,6 +126,30 @@ AST* interp_binop_sub(AST* node) {
     AST* right = interp(node->binop.right);
     if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
         return create_ast_integer(left->integer.value - right->integer.value);
+    } else if (ast_match_type(left, parse_from_string("1")) && ast_match_type(right, parse_from_string("1/1"))) {
+        // a - b/c -> ac/c - b/c = (ac-b)/c
+        AST* a = left;
+        AST* b = right->binop.left;
+        AST* c = right->binop.right;
+        return interp_binop_div(
+            create_ast_binop( 
+                create_ast_binop(
+                    create_ast_binop(a, c, OP_MUL),
+                    b,
+                    OP_SUB
+                ),
+                c,
+                OP_DIV
+            )
+        );
+    } else if (ast_match_type(left, parse_from_string("1/1")) && ast_match_type(right, parse_from_string("1"))) {
+        // a/b - c -> a/b - cb/b = (a-cb)/b
+        AST *a = left->binop.left;
+        AST *b = left->binop.right;
+        AST *c = right;
+        AST *cb = create_ast_binop(c, b, OP_MUL);
+        AST *numerator = create_ast_binop(a, cb, OP_SUB);
+        return interp_binop_div(create_ast_binop(numerator, b, OP_DIV));
     }
     return create_ast_binop(left, right, OP_SUB);
 }
@@ -137,6 +161,19 @@ AST* interp_binop_mul(AST* node) {
         return create_ast_integer(left->integer.value * right->integer.value);
     } else if (ast_match(left, create_ast_integer(0)) || ast_match(create_ast_integer(0), right)) {
         return create_ast_integer(0);
+    } else if (ast_match(left, right)) {
+        return interp_binop_pow(create_ast_binop(left, create_ast_integer(2), OP_POW));
+    } else if (ast_match_type(left, parse_from_string("1/1")) && ast_match_type(right, parse_from_string("1/1"))) {
+        // a/b * c/d -> ac/bd
+        AST *a = left->binop.left;
+        AST *b = left->binop.right;
+        AST *c = right->binop.left;
+        AST *d = right->binop.right;
+        AST *ac = create_ast_binop(a, c, OP_MUL);
+        AST *bd = create_ast_binop(b, d, OP_MUL);
+        return interp_binop_div(
+            create_ast_binop(ac, bd, OP_DIV)
+        );
     }
     return create_ast_binop(left, right, OP_MUL);
 }
@@ -165,6 +202,10 @@ AST *interp_binop_pow(AST *node) {
         long double r = (long double)right->integer.value;
         int64_t result = (int64_t)powl(l, r);
         return create_ast_integer(result);
+    } else if (ast_match(right, create_ast_integer(0))) {
+        return create_ast_integer(1);
+    } else if (ast_match(right, create_ast_integer(1))) {
+        return left;
     }
     return create_ast_binop(left, right, OP_POW);
 }

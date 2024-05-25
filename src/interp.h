@@ -1,6 +1,7 @@
 #include "parser.h"
 
 AST *interp(AST*);
+AST *interp_binop_pow(AST*);
 
 AST* interp_from_string(char*);
 

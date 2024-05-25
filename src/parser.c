@@ -119,7 +119,12 @@ AST *parse_factor(Parser *parser) {
 AST* parse_term(Parser* parser) {
     AST* result = parse_factor(parser);
 
-    while (parser->tokens.data[parser->pos].type == TOKEN_STAR || parser->tokens.data[parser->pos].type == TOKEN_SLASH || parser->tokens.data[parser->pos].type == TOKEN_IDENTIFIER) {
+    while (
+        parser->tokens.data[parser->pos].type == TOKEN_STAR ||
+        parser->tokens.data[parser->pos].type == TOKEN_SLASH ||
+        parser->tokens.data[parser->pos].type == TOKEN_IDENTIFIER ||
+        parser->tokens.data[parser->pos].type == TOKEN_L_PAREN
+    ) {
         if (parser->tokens.data[parser->pos].type == TOKEN_STAR) {
             parser_expect(parser, TOKEN_STAR);
             result = create_ast_binop(result, parse_factor(parser), OP_MUL);
@@ -128,8 +133,11 @@ AST* parse_term(Parser* parser) {
             result = create_ast_binop(result, parse_factor(parser), OP_DIV);
         } else if (parser->tokens.data[parser->pos].type == TOKEN_IDENTIFIER) {
             result = create_ast_binop(result, parse_factor(parser), OP_MUL);
+        } else if (parser->tokens.data[parser->pos].type == TOKEN_L_PAREN) {
+            result = create_ast_binop(result, parse_exp(parser), OP_MUL);
         }
     }
+
     return result;
 }
 
