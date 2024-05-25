@@ -7,6 +7,19 @@
 
 #include "lexer.h"
 
+const char *KEYWORDS[] = {
+    "sqrt", "sin", "cos", "pi", "any"
+};
+const size_t KEYWORDS_COUNT = sizeof(KEYWORDS) / sizeof(KEYWORDS[0]);
+
+bool is_keyword(char *s) {
+    for (size_t i = 0; i < KEYWORDS_COUNT; i++) {
+        if (!strcmp(s, KEYWORDS[i])) return true;
+    }  
+
+    return false;
+}
+
 void tokens_print(Tokens *tokens) {
     for (size_t i = 0; i < tokens->size; i++) {
         Token *token = &tokens->data[i];
@@ -44,18 +57,22 @@ Tokens tokenize(char* source) {
             tokens_append(&tokens, token);
             i--;
         } else if (isalpha(source[i])) {
-            // maybe we need this code again when introducing identifier for function calls e.g. sin(2)
+            // collect alphanumeric chars into the buffer
             char buffer[FIXED_STRING_SIZE] = "";
             size_t first = i;
             while (isalpha(source[i]) || (i > first && (isalpha(source[i]) || isdigit(source[i])))) {
                 strncat(buffer, &source[i], 1);
                 i++;
             }
-            if (!strcmp(buffer, "sqrt") || !strcmp(buffer, "sin") || !strcmp(buffer, "cos") || !strcmp(buffer, "pi")) {
+
+            // when the buffer matches a keyword this will become one identifier token
+            // if (!strcmp(buffer, "sqrt") || !strcmp(buffer, "sin") || !strcmp(buffer, "cos") || !strcmp(buffer, "pi")) {
+            if (is_keyword(buffer)) {
                 Token token = { .type = TOKEN_IDENTIFIER };
                 strcpy(token.text, buffer);
                 tokens_append(&tokens, token);
                 i--;
+            // when not, every char becomes a seperate identifier token
             } else {
                 i = first;
                 Token token = { .type = TOKEN_IDENTIFIER };
@@ -63,6 +80,7 @@ Tokens tokenize(char* source) {
                 tokens_append(&tokens, token);
             }
         } else if (source[i] == '+') {
+            // TODO: Remove char -> text copy.
             Token token = { .type = TOKEN_PLUS };
             strncpy(token.text, &source[i], 1);
             tokens_append(&tokens, token);
@@ -92,6 +110,10 @@ Tokens tokenize(char* source) {
             tokens_append(&tokens, token);
         } else if (isspace(source[i])) {
             // ignore spaces for now
+        } else if (source[i] == '#') {
+            Token token = { .type = TOKEN_HASH };
+            strncpy(token.text, &source[i], 1);
+            tokens_append(&tokens, token);
         } else {
             fprintf(stderr, "ERROR: Can't tokenize '%c'\n", source[i]);
             exit(1);
@@ -114,6 +136,7 @@ const char *token_type_to_string(TokenType type) {
         case TOKEN_CARET: return "CARET";
         case TOKEN_L_PAREN: return "L_PAREN";
         case TOKEN_R_PAREN: return "R_PAREN";
+        case TOKEN_HASH: return "HASH";
         case TOKEN_EOF: return "EOF";
         default: assert(false);
     }

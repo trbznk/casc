@@ -169,16 +169,14 @@ int main(int argc, char *argv[]) {
 
     if (do_cli) {
         // ast_match_type()
-        // char* input = "7 + 3 * (10 / (12 / (3 + 1) - 1))";
-        char* input = "1/8 * (-4-2*4/3-1)"; // -23/24
-        // char* input = "-4-8/3";
+        char* input = "#(any)";
         Tokens tokens = tokenize(input);
         tokens_print(&tokens);
 
-        AST* output = interp_from_string(input);
-        printf("%s\n", ast_to_string(output));
-        printf("%s\n", ast_to_debug_string(output));
-        printf("%s\n", ast_to_debug_string(interp_from_string("-23/24")));
+        // AST* output = interp_from_string(input);
+        // printf("%s\n", ast_to_string(output));
+        // printf("%s\n", ast_to_debug_string(output));
+        // printf("%s\n", ast_to_debug_string(interp_from_string("-23/24")));
         // bool r = ast_match_type(output, parse_from_string("1/1 + 1/1"));
         // printf("r=%d\n", r);
         

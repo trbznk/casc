@@ -3,6 +3,9 @@
 
 #define FIXED_STRING_SIZE 32
 
+extern const char *KEYWORDS[];
+extern const size_t KEYWORDS_COUNT;
+
 typedef enum {
     TOKEN_NUMBER,
     TOKEN_IDENTIFIER,
@@ -14,6 +17,8 @@ typedef enum {
 
     TOKEN_L_PAREN,
     TOKEN_R_PAREN,
+
+    TOKEN_HASH,
 
     TOKEN_EOF,
 
