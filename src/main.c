@@ -9,6 +9,7 @@
 #include "parser.h"
 #include "interp.h"
 #include "gui.h"
+#include "utils.h"
 
 void test() {
     size_t test_id = 1;
@@ -176,13 +177,24 @@ int main(int argc, char *argv[]) {
     if (do_cli) {
         // ast_match_type()
 
+        // Allocator a = create_allocator(1024);
+
+        // char* output = mmalloc(&a, 64);
+        // output[0] = 'a';
+        // printf("%c\n", output[0]);
+
+        // allocator_free(&a);
+
+        // printf("%c\n", output[0]);
+
         // printf("%s\n", ast_to_debug_string(output));
-        char* input = "log(1, 10)";
-        Tokens tokens = tokenize(input);
-        tokens_print(&tokens);
-        AST* output = interp_from_string(input);
-        printf("%s\n", ast_to_string(output));
-        printf("%s\n", ast_to_debug_string(output));
+        // char* input = "1+x*(x^2)+3";
+        // printf("%s\n", ast_to_debug_string(parse_from_string(input)));
+        // Tokens tokens = tokenize(input);
+        // tokens_print(&tokens);
+        // AST* output = interp_from_string(input);
+        // printf("%s\n", ast_to_string(output));
+        // printf("%s\n", ast_to_debug_string(output));
         // printf("%s\n", ast_to_debug_string(interp_from_string("-23/24")));
         // bool r = ast_match_type(output, parse_from_string("1/1 + 1/1"));
         // printf("r=%d\n", r);
