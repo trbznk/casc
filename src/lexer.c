@@ -7,8 +7,10 @@
 
 #include "lexer.h"
 
+// TODO: sqrt, sin, ... are not keywords, but builtin functions
+//       same goes for pi (builtin constant)
 const char *KEYWORDS[] = {
-    "sqrt", "sin", "cos", "pi", "any", "dummy"
+    "sqrt", "sin", "cos", "pi"
 };
 const size_t KEYWORDS_COUNT = sizeof(KEYWORDS) / sizeof(KEYWORDS[0]);
 
