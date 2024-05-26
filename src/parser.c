@@ -63,18 +63,30 @@ AST* create_ast_empty() {
     return node;
 }
 
+AST *create_ast_dummy(int flags) {
+    AST* node = malloc(sizeof(AST));
+    node->type = AST_DUMMY;
+    node->dummy = flags;
+    return node;
+}
+
 AST *parse_exp(Parser* parser) {
     Token current_token = parser->tokens.data[parser->pos];
     if (current_token.type == TOKEN_NUMBER) {
         parser_expect(parser, TOKEN_NUMBER);
         return create_ast_integer(atoi(current_token.text));
     } else if (current_token.type == TOKEN_IDENTIFIER) {
-        if (!strcmp(current_token.text, "sqrt") || !strcmp(current_token.text, "sin") || !strcmp(current_token.text, "cos")) {
+        if (
+            !strcmp(current_token.text, "sqrt") ||
+            !strcmp(current_token.text, "sin") ||
+            !strcmp(current_token.text, "cos") ||
+            !strcmp(current_token.text, "dummy")
+        ) {
             parser_expect(parser, TOKEN_IDENTIFIER);
             parser_expect(parser, TOKEN_L_PAREN);
-            AST* body = parse_expr(parser);
+            AST* arg = parse_expr(parser);
             parser_expect(parser, TOKEN_R_PAREN);
-            return create_ast_func_call(current_token, body);
+            return create_ast_func_call(current_token, arg);
         } else if (!strcmp(current_token.text, "pi")) {
             parser_expect(parser, TOKEN_IDENTIFIER);
             return create_ast_constant(current_token);
@@ -205,6 +217,7 @@ const char* ast_type_to_debug_string(ASTType type) {
         case AST_BINOP: return "BinOp";
         case AST_UNARYOP: return "UnaryOp";
         case AST_FUNC_CALL: return "FuncCall";
+        case AST_DUMMY: return "Dummy";
         case AST_EMPTY: return "Empty";
         case AST_TYPE_COUNT: assert(false);
     }

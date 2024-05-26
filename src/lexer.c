@@ -8,7 +8,7 @@
 #include "lexer.h"
 
 const char *KEYWORDS[] = {
-    "sqrt", "sin", "cos", "pi", "any"
+    "sqrt", "sin", "cos", "pi", "any", "dummy"
 };
 const size_t KEYWORDS_COUNT = sizeof(KEYWORDS) / sizeof(KEYWORDS[0]);
 

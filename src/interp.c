@@ -13,6 +13,7 @@ AST *interp_binop(AST*);
 
 
 bool ast_match(AST* left, AST* right) {
+
     if (left->type == right->type) {
         switch (left->type) {
             case AST_INTEGER:
@@ -28,6 +29,19 @@ bool ast_match(AST* left, AST* right) {
             default: fprintf(stderr, "ERROR: Cannot do 'ast_match' because node type '%s' is not implemented.\n", ast_type_to_debug_string(left->type)); exit(1);
         }
     }
+
+    // the comparison is commutative so we switch position to put AST_DUMMY always right.
+    // Then only one implementation for the comparison is needed.
+    if (left->type == AST_DUMMY) {
+        return ast_match(right, left);
+    } else if (right->type == AST_DUMMY) {
+        if (right->dummy == 0) {
+            return true;
+        } else {
+            assert(false);
+        }
+    }
+
     return false;
 }
 
@@ -64,6 +78,7 @@ char *ast_to_debug_string(AST* node) {
         case AST_BINOP: sprintf(output, "%s(%s, %s)", op_type_to_debug_string(node->binop.type), ast_to_debug_string(node->binop.left), ast_to_debug_string(node->binop.right)); break;
         case AST_UNARYOP: sprintf(output, "%s(%s)", op_type_to_debug_string(node->unaryop.type), ast_to_debug_string(node->unaryop.expr)); break;
         case AST_FUNC_CALL: sprintf(output, "%s(%s)", node->func_call.name.text, ast_to_debug_string(node->func_call.arg)); break;
+        case AST_DUMMY: sprintf(output, "%s", ast_to_string(node)); break;
         case AST_EMPTY: sprintf(output, "Empty()"); break;
         default: fprintf(stderr, "ERROR: Cannot do 'ast_to_debug_string' because node type '%s' is not implemented.\n", ast_type_to_debug_string(node->type)); exit(1);
     }
@@ -85,6 +100,7 @@ char *ast_to_string(AST* node) {
         }
         case AST_UNARYOP: sprintf(output, "%s%s", op_type_to_string(node->unaryop.type), ast_to_string(node->unaryop.expr)); break;
         case AST_FUNC_CALL: sprintf(output, "%s(%s)", node->func_call.name.text, ast_to_string(node->func_call.arg)); break;
+        case AST_DUMMY: sprintf(output, "%s(%x)", ast_type_to_debug_string(node->type), node->dummy);
         case AST_EMPTY: break;
         default: fprintf(stderr, "ERROR: Cannot do 'ast_to_string' because node type '%s' is not implemented.\n", ast_type_to_debug_string(node->type)); exit(1);
     }
@@ -116,6 +132,12 @@ AST* interp_binop_add(AST* node) {
         if (ast_match(left->binop.right, right)) {
             AST* new_left = interp_binop(create_ast_binop(create_ast_integer(1), left->binop.left, OP_ADD));
             return create_ast_binop(new_left, right, OP_MUL);
+        }
+    } else if (ast_match(left, create_ast_integer(0)) || ast_match(right, create_ast_integer(0))) {
+        if (ast_match(left, create_ast_integer(0))) {
+            return right;
+        } else {
+            return left;
         }
     }
     return create_ast_binop(left, right, OP_ADD);
@@ -174,6 +196,12 @@ AST* interp_binop_mul(AST* node) {
         return interp_binop_div(
             create_ast_binop(ac, bd, OP_DIV)
         );
+    } else if (ast_match(left, create_ast_integer(1)) || ast_match(right, create_ast_integer(1))) {
+        if (ast_match(left, create_ast_integer(1))) {
+            return right;
+        } else {
+            return left;
+        }
     }
     return create_ast_binop(left, right, OP_MUL);
 }
@@ -254,6 +282,17 @@ AST* interp_func_call(AST* node) {
                 int p = arg->integer.value / q;
                 return create_ast_binop(create_ast_integer((int64_t)sqrt_of_q), create_ast_func_call(name, create_ast_integer(p)), OP_MUL);
             }
+        }
+    } else if (!strcmp(name.text, "dummy")) {
+        if (arg->type == AST_SYMBOL) {
+            if (!strcmp(arg->symbol.name.text, "any")) {
+                return create_ast_dummy(0);
+                assert(false);
+            } else {
+                assert(false);
+            }
+        } else {
+            assert(false);
         }
     } else if (ast_match(node, parse_from_string("sin(pi)"))) {
         return create_ast_integer(0);

@@ -38,6 +38,8 @@ typedef enum {
     // TODO: rename this to AST_FUNC_CALL everywhere to make it more explicit
     AST_FUNC_CALL,
 
+    AST_DUMMY,
+
     // TODO: remove AST_EMPTY type when there are more high level nodes like NODE_PROGRAMM or something similar
     AST_EMPTY,
 
@@ -81,6 +83,7 @@ struct AST {
         ASTBinOp binop;
         ASTUnaryOp unaryop;
         ASTFuncCall func_call;
+        int dummy;
         bool empty; // temporary for ASTType empty
     };
 };
@@ -96,6 +99,7 @@ AST* create_ast_constant(Token);
 AST* create_ast_binop(AST*, AST*, OpType);
 AST* create_ast_unaryop(AST*, OpType);
 AST* create_ast_func_call(Token, AST*);
+AST* create_ast_dummy(int);
 AST* create_ast_empty();
 
 AST* parse(Parser*);
