@@ -10,9 +10,19 @@ void parser_expect(Parser* parser, TokenType type) {
     if (parser->tokens.data[parser->pos].type == type) {
         parser->pos++;
     } else {
-        fprintf(stderr, "ERROR: Expected %s got %s.", token_type_to_string(type), token_type_to_string(parser->tokens.data[parser->pos].type));
+        fprintf(stderr, "ERROR: Expected %s got %s.\n", token_type_to_string(type), token_type_to_string(parser->tokens.data[parser->pos].type));
     }
-}   
+}
+
+void ast_array_append(ASTArray *array, AST *node) {
+    if (array->size == 0) {
+        array->data = malloc(sizeof(AST));
+    } else {
+        array->data = realloc(array->data, (array->size+1)*sizeof(AST));
+    }
+    array->data[array->size] = node;
+    array->size++;
+};
 
 AST* create_ast_integer(int64_t value) {
     AST* node = malloc(sizeof(AST));
@@ -49,10 +59,10 @@ AST* create_ast_unaryop(AST* expr, OpType type) {
     return node;
 }
 
-AST* create_ast_func_call(Token name, AST *arg) {
+AST* create_ast_func_call(Token name, ASTArray args) {
     AST *node = malloc(sizeof(AST));
     node->type = AST_FUNC_CALL;
-    node->func_call = (ASTFuncCall){ .name=name, .arg=arg };
+    node->func_call = (ASTFuncCall){ .name=name, .args=args };
     return node;
 }
 
@@ -72,9 +82,16 @@ AST *parse_exp(Parser* parser) {
         if (is_builtin_function(current_token.text)) {
             parser_expect(parser, TOKEN_IDENTIFIER);
             parser_expect(parser, TOKEN_L_PAREN);
-            AST* arg = parse_expr(parser);
+
+            ASTArray args = {0};
+            ast_array_append(&args, parse_expr(parser));
+            while (parser->tokens.data[parser->pos].type == TOKEN_COMMA) {
+                parser_expect(parser, TOKEN_COMMA);
+                ast_array_append(&args, parse_expr(parser));
+            }
+
             parser_expect(parser, TOKEN_R_PAREN);
-            return create_ast_func_call(current_token, arg);
+            return create_ast_func_call(current_token, args);
         } else if (is_builtin_constant(current_token.text)) {
             parser_expect(parser, TOKEN_IDENTIFIER);
             return create_ast_constant(current_token);
@@ -97,6 +114,7 @@ AST *parse_exp(Parser* parser) {
         // I think we can ignore EOF token for now and simply return it
         return create_ast_empty();
     } else {
+        printf("%s\n", token_type_to_string(current_token.type));
         assert(false);
     }
 }

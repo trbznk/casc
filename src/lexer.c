@@ -8,7 +8,7 @@
 #include "lexer.h"
 
 const char *BUILTIN_FUNCTIONS[] = {
-    "sqrt", "sin", "cos", "ln"
+    "sqrt", "sin", "cos", "ln", "log"
 };
 const size_t BUILTIN_FUNCTIONS_COUNT = sizeof(BUILTIN_FUNCTIONS) / sizeof(BUILTIN_FUNCTIONS[0]);
 
@@ -125,6 +125,10 @@ Tokens tokenize(char* source) {
             Token token = { .type = TOKEN_HASH };
             strncpy(token.text, &source[i], 1);
             tokens_append(&tokens, token);
+        } else if (source[i] == ',') {
+            Token token = { .type = TOKEN_COMMA };
+            strncpy(token.text, &source[i], 1);
+            tokens_append(&tokens, token);
         } else {
             fprintf(stderr, "ERROR: Can't tokenize '%c'\n", source[i]);
             exit(1);
@@ -148,6 +152,7 @@ const char *token_type_to_string(TokenType type) {
         case TOKEN_L_PAREN: return "L_PAREN";
         case TOKEN_R_PAREN: return "R_PAREN";
         case TOKEN_HASH: return "HASH";
+        case TOKEN_COMMA: return "COMMA";
         case TOKEN_EOF: return "EOF";
         default: assert(false);
     }

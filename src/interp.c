@@ -24,8 +24,20 @@ bool ast_match(AST* left, AST* right) {
                 return !strcmp(left->constant.name.text, right->constant.name.text);
             case AST_BINOP:
                 return ast_match(left->binop.left, right->binop.left) && ast_match(left->binop.right, right->binop.right);
-            case AST_FUNC_CALL:
-                return !strcmp(left->func_call.name.text, right->func_call.name.text) && ast_match(left->func_call.arg, right->func_call.arg);
+            case AST_FUNC_CALL: {
+                if (
+                    !strcmp(left->func_call.name.text, right->func_call.name.text) &&
+                    left->func_call.args.size == right->func_call.args.size
+                ) {
+                    for (size_t i = 0; i < left->func_call.args.size; i++) {
+                        if (!ast_match(left->func_call.args.data[i], right->func_call.args.data[i])) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                return false;
+            }
             default: fprintf(stderr, "ERROR: Cannot do 'ast_match' because node type '%s' is not implemented.\n", ast_type_to_debug_string(left->type)); exit(1);
         }
     }
@@ -65,7 +77,8 @@ char *ast_to_debug_string(AST* node) {
         case AST_CONSTANT: sprintf(output, "%s(%s)", ast_type_to_debug_string(node->type), node->constant.name.text); break;
         case AST_BINOP: sprintf(output, "%s(%s, %s)", op_type_to_debug_string(node->binop.type), ast_to_debug_string(node->binop.left), ast_to_debug_string(node->binop.right)); break;
         case AST_UNARYOP: sprintf(output, "%s(%s)", op_type_to_debug_string(node->unaryop.type), ast_to_debug_string(node->unaryop.expr)); break;
-        case AST_FUNC_CALL: sprintf(output, "%s(%s)", node->func_call.name.text, ast_to_debug_string(node->func_call.arg)); break;
+        // TODO: args to debug string
+        case AST_FUNC_CALL: sprintf(output, "%s(args)", node->func_call.name.text); break;
         case AST_EMPTY: sprintf(output, "Empty()"); break;
         default: fprintf(stderr, "ERROR: Cannot do 'ast_to_debug_string' because node type '%s' is not implemented.\n", ast_type_to_debug_string(node->type)); exit(1);
     }
@@ -86,7 +99,8 @@ char *ast_to_string(AST* node) {
             break;
         }
         case AST_UNARYOP: sprintf(output, "%s%s", op_type_to_string(node->unaryop.type), ast_to_string(node->unaryop.expr)); break;
-        case AST_FUNC_CALL: sprintf(output, "%s(%s)", node->func_call.name.text, ast_to_string(node->func_call.arg)); break;
+        // TODO: args to string
+        case AST_FUNC_CALL: sprintf(output, "%s(args)", node->func_call.name.text); break;
         case AST_EMPTY: break;
         default: fprintf(stderr, "ERROR: Cannot do 'ast_to_string' because node type '%s' is not implemented.\n", ast_type_to_debug_string(node->type)); exit(1);
     }
@@ -255,8 +269,17 @@ AST* interp_unaryop(AST* node) {
 }
 
 AST* interp_func_call(AST* node) {
+    // TODO: we need a proper system for checking and using args (function definitions and function signatures)
+
     Token name = node->func_call.name;
-    AST* arg = interp(node->func_call.arg);
+
+    for (size_t i = 0; i < node->func_call.args.size; i++) {
+        node->func_call.args.data[i] = interp(node->func_call.args.data[i]);
+    }
+    // for most cases we only use first arg for now
+    // TODO: remove this later
+    AST *arg = node->func_call.args.data[0];
+
     if (!strcmp(name.text, "sqrt") && arg->type == AST_INTEGER) {
         double result = sqrt((double)arg->integer.value);
         if (fmod((double)arg->integer.value, result) == 0.0) {
@@ -270,8 +293,30 @@ AST* interp_func_call(AST* node) {
             bool is_perfect_square = sqrt_of_q == floor(sqrt_of_q);
             if (is_perfect_square && arg->integer.value % q == 0) {
                 int p = arg->integer.value / q;
-                return create_ast_binop(create_ast_integer((int64_t)sqrt_of_q), create_ast_func_call(name, create_ast_integer(p)), OP_MUL);
+                ASTArray args = {0};
+                ast_array_append(&args, create_ast_integer(p));
+                return create_ast_binop(create_ast_integer((int64_t)sqrt_of_q), create_ast_func_call(name, args), OP_MUL);
             }
+        }
+    } else if (!strcmp(name.text, "ln")) {
+        if (ast_match(arg, interp_from_string("e"))) {
+            return create_ast_integer(1);
+        } else if (ast_match(arg, create_ast_integer(1))) {
+            return create_ast_integer(0);
+        }
+    } else if (!strcmp(name.text, "log")) {
+        if (node->func_call.args.size == 2) {
+            // log_b(y) = x
+            // b^x = y
+            AST* y = node->func_call.args.data[0];
+            AST* b = node->func_call.args.data[1];
+            if (ast_match(y, create_ast_integer(1))) {
+                return create_ast_integer(0);
+            } else if (ast_match(y, b)) {
+                return create_ast_integer(1);
+            }
+        } else {
+            assert(false);
         }
     } else if (ast_match(node, parse_from_string("sin(pi)"))) {
         return create_ast_integer(0);

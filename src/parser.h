@@ -8,6 +8,7 @@
 
 typedef struct Parser Parser;
 typedef struct AST AST;
+typedef struct ASTArray ASTArray;
 typedef struct ASTInteger ASTInteger;
 typedef struct ASTSymbol ASTSymbol;
 typedef struct ASTConstant ASTConstant;
@@ -67,9 +68,14 @@ struct ASTUnaryOp {
     OpType type;
 };
 
+struct ASTArray {
+    size_t size;
+    AST **data;
+};
+
 struct ASTFuncCall {
     Token name;
-    AST* arg;
+    ASTArray args;
 };
 
 struct AST {
@@ -95,13 +101,15 @@ AST* create_ast_symbol(Token);
 AST* create_ast_constant(Token);
 AST* create_ast_binop(AST*, AST*, OpType);
 AST* create_ast_unaryop(AST*, OpType);
-AST* create_ast_func_call(Token, AST*);
+AST* create_ast_func_call(Token, ASTArray);
 AST* create_ast_empty();
 
 AST* parse(Parser*);
 AST* parse_expr(Parser*);
 AST* parse_factor(Parser*);
 AST* parse_from_string(char*);
+
+void ast_array_append(ASTArray*, AST*);
 
 const char* op_type_to_debug_string(OpType);
 const char* op_type_to_string(OpType);

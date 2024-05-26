@@ -23,6 +23,7 @@ typedef enum {
     TOKEN_L_PAREN,
     TOKEN_R_PAREN,
 
+    TOKEN_COMMA,
     TOKEN_HASH,
 
     TOKEN_EOF,

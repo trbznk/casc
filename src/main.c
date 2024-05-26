@@ -67,8 +67,8 @@ void test() {
     TEST_SOURCE_TO_INTERP("5 - - - + - (3 + 4) - +2", create_ast_integer(10));
 
     // things from the sympy tutorial
-    TEST_SOURCE_TO_PARSE("sqrt(3)", create_ast_func_call((Token){ .text="sqrt" }, create_ast_integer(3)));
-    TEST_SOURCE_TO_INTERP("sqrt(8)", create_ast_binop(create_ast_integer(2), create_ast_func_call((Token){ .text="sqrt" }, create_ast_integer(2)), OP_MUL));
+    TEST_SOURCE_TO_INTERP("sqrt(8)", parse_from_string("2*sqrt(2)"));
+    // TEST_SOURCE_TO_INTERP("sqrt(8)", create_ast_binop(create_ast_integer(2), create_ast_func_call((Token){ .text="sqrt" }, create_ast_integer(2)), OP_MUL));
 
     // misc
     TEST_SOURCE_TO_INTERP("sqrt(9)", create_ast_integer(3));
@@ -89,6 +89,10 @@ void test() {
     TEST_SOURCE_TO_INTERP("0+a", interp_from_string("a"));
     TEST_SOURCE_TO_INTERP("a-0", interp_from_string("a"));
     TEST_SOURCE_TO_INTERP("a*1", interp_from_string("a"));
+    TEST_SOURCE_TO_INTERP("ln(e)", interp_from_string("1"));
+    TEST_SOURCE_TO_INTERP("ln(1)", interp_from_string("0"));
+    TEST_SOURCE_TO_INTERP("log(1, 10)", interp_from_string("0"));
+    TEST_SOURCE_TO_INTERP("log(10, 10)", interp_from_string("1"));
 
     // auto generated
     TEST_SOURCE_TO_INTERP("48+-75", create_ast_integer(-27));
@@ -173,10 +177,9 @@ int main(int argc, char *argv[]) {
         // ast_match_type()
 
         // printf("%s\n", ast_to_debug_string(output));
-        char* input = "ln(3)";
+        char* input = "log(1, 10)";
         Tokens tokens = tokenize(input);
         tokens_print(&tokens);
-
         AST* output = interp_from_string(input);
         printf("%s\n", ast_to_string(output));
         printf("%s\n", ast_to_debug_string(output));
