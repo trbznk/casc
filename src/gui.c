@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdio.h>
 
 #include "interp.h"
 #include "gui.h"
@@ -33,10 +34,30 @@ void init_gui() {
 
     SetTargetFPS(60);
 
+    bool last_char_is_caret = false;
     while (!WindowShouldClose()) {
 
+        //
         // Control
+        //
         char c = GetCharPressed();
+
+        // handle the caret key ^ seperatly because it has dead key mechanism.
+        // So we need to clear the buffer here and call GetCharPressed again,
+        // because the first call has not the right return value for us.
+        if (last_char_is_caret && c != 0) {
+            if (c < 0) {
+                c = 'a';
+            } else {
+                c = GetCharPressed();
+            }
+            last_char_is_caret = false;
+        }
+        if (GetKeyPressed() == 161) {
+            c = '^';
+            last_char_is_caret = true;
+        }
+        
         if (c != 0) {
             assert(strlen(cell_input_buffer) + 1 < CELL_INPUT_BUFFER_SIZE);
             memmove(
@@ -72,7 +93,9 @@ void init_gui() {
             cell_output_buffer = ast_to_string(output);
         }
 
+        //
         // Draw
+        //
         BeginDrawing();
             ClearBackground(WHITE);
             DrawText(cell_input_buffer, 10, 10, font_size, BLACK);
