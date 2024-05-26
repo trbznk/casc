@@ -173,7 +173,7 @@ int main(int argc, char *argv[]) {
         // ast_match_type()
 
         // printf("%s\n", ast_to_debug_string(output));
-        char* input = "a-0";
+        char* input = "ln(3)";
         Tokens tokens = tokenize(input);
         tokens_print(&tokens);
 

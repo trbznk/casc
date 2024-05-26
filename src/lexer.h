@@ -1,10 +1,15 @@
 #ifndef LEXER_H
 #define LEXER_H
 
+#include <stdbool.h>
+
 #define FIXED_STRING_SIZE 32
 
-extern const char *KEYWORDS[];
-extern const size_t KEYWORDS_COUNT;
+extern const char *BUILTIN_FUNCTIONS[];
+extern const size_t BUILTIN_FUNCTIONS_COUNT;
+
+extern const char *BUILTIN_CONSTANTS[];
+extern const size_t BUILTIN_CONSTANTS_COUNT;
 
 typedef enum {
     TOKEN_NUMBER,
@@ -44,5 +49,8 @@ typedef struct {
 Tokens tokenize(char*);
 void tokens_print(Tokens*);
 const char* token_type_to_string(TokenType);
+
+bool is_builtin_function(char*);
+bool is_builtin_constant(char*);
 
 #endif

@@ -69,17 +69,13 @@ AST *parse_exp(Parser* parser) {
         parser_expect(parser, TOKEN_NUMBER);
         return create_ast_integer(atoi(current_token.text));
     } else if (current_token.type == TOKEN_IDENTIFIER) {
-        if (
-            !strcmp(current_token.text, "sqrt") ||
-            !strcmp(current_token.text, "sin") ||
-            !strcmp(current_token.text, "cos")
-        ) {
+        if (is_builtin_function(current_token.text)) {
             parser_expect(parser, TOKEN_IDENTIFIER);
             parser_expect(parser, TOKEN_L_PAREN);
             AST* arg = parse_expr(parser);
             parser_expect(parser, TOKEN_R_PAREN);
             return create_ast_func_call(current_token, arg);
-        } else if (!strcmp(current_token.text, "pi")) {
+        } else if (is_builtin_constant(current_token.text)) {
             parser_expect(parser, TOKEN_IDENTIFIER);
             return create_ast_constant(current_token);
         } else {

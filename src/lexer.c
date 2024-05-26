@@ -7,18 +7,27 @@
 
 #include "lexer.h"
 
-// TODO: sqrt, sin, ... are not keywords, but builtin functions
-//       same goes for pi (builtin constant)
-const char *KEYWORDS[] = {
-    "sqrt", "sin", "cos", "pi"
+const char *BUILTIN_FUNCTIONS[] = {
+    "sqrt", "sin", "cos", "ln"
 };
-const size_t KEYWORDS_COUNT = sizeof(KEYWORDS) / sizeof(KEYWORDS[0]);
+const size_t BUILTIN_FUNCTIONS_COUNT = sizeof(BUILTIN_FUNCTIONS) / sizeof(BUILTIN_FUNCTIONS[0]);
 
-bool is_keyword(char *s) {
-    for (size_t i = 0; i < KEYWORDS_COUNT; i++) {
-        if (!strcmp(s, KEYWORDS[i])) return true;
+const char *BUILTIN_CONSTANTS[] = {
+    "pi", "e"
+};
+const size_t BUILTIN_CONSTANTS_COUNT = sizeof(BUILTIN_CONSTANTS) / sizeof(BUILTIN_CONSTANTS[0]);
+
+bool is_builtin_function(char *s) {
+    for (size_t i = 0; i < BUILTIN_FUNCTIONS_COUNT; i++) {
+        if (!strcmp(s, BUILTIN_FUNCTIONS[i])) return true;
     }  
+    return false;
+}
 
+bool is_builtin_constant(char *s) {
+    for (size_t i = 0; i < BUILTIN_CONSTANTS_COUNT; i++) {
+        if (!strcmp(s, BUILTIN_CONSTANTS[i])) return true;
+    }  
     return false;
 }
 
@@ -69,7 +78,7 @@ Tokens tokenize(char* source) {
 
             // when the buffer matches a keyword this will become one identifier token
             // if (!strcmp(buffer, "sqrt") || !strcmp(buffer, "sin") || !strcmp(buffer, "cos") || !strcmp(buffer, "pi")) {
-            if (is_keyword(buffer)) {
+            if (is_builtin_function(buffer) || is_builtin_constant(buffer)) {
                 Token token = { .type = TOKEN_IDENTIFIER };
                 strcpy(token.text, buffer);
                 tokens_append(&tokens, token);
