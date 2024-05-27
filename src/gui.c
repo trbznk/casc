@@ -3,10 +3,9 @@
 #include <assert.h>
 #include <stdio.h>
 
-#include "interp.h"
-#include "gui.h"
-
 #include "raylib.h"
+
+#include "casc.h"
 
 #define CELL_INPUT_BUFFER_SIZE 1024
 #define CELL_OUTPUT_BUFFER_SIZE 1024

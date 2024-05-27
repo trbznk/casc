@@ -3,9 +3,9 @@
 #include <math.h>
 #include <assert.h>
 #include <string.h>
+#include <stdbool.h>
 
-#include "parser.h"
-#include "interp.h"
+#include "casc.h"
 
 // forward declarations
 AST *interp_binop_div(AST*);

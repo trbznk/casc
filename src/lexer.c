@@ -5,7 +5,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 
-#include "lexer.h"
+#include "casc.h"
 
 const char *BUILTIN_FUNCTIONS[] = {
     "sqrt", "sin", "cos", "ln", "log"
