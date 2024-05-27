@@ -60,14 +60,17 @@ typedef struct {
 // TODO: transform this into a lexer. This is not only for naming, but to make it clearer
 //       and differ it from the parser. Although we can implemente methods like peek_next_char
 //       and similar things more easily.
-typedef struct {
-    size_t size;
-    size_t capacity;
-    Token *data;
-} Tokens;
+typedef struct Lexer Lexer;
+struct Lexer {
+    char* source;
+    size_t pos;
+};
 
-Tokens tokenize(char*);
-void tokens_print(Tokens*);
+char lexer_current_char(Lexer*);
+Token lexer_peek_token(Lexer*);
+Token lexer_next_token(Lexer*);
+void lexer_print_tokens(Lexer*);
+
 const char* token_type_to_string(TokenType);
 
 bool is_builtin_function(char*);
@@ -171,8 +174,7 @@ const char* ast_type_to_debug_string(ASTType);
 typedef struct Parser Parser;
 
 struct Parser {
-    Tokens tokens;
-    size_t pos;
+    Lexer lexer;
 };
 
 AST* parse(Parser*);

@@ -31,113 +31,154 @@ bool is_builtin_constant(char *s) {
     return false;
 }
 
-void tokens_print(Tokens *tokens) {
-    for (size_t i = 0; i < tokens->size; i++) {
-        Token *token = &tokens->data[i];
-        printf("%s('%s') ", token_type_to_string(token->type), token->text);
-    }
+void lexer_print_tokens(Lexer *lexer) {
+    Token token;
+    do {
+        token = lexer_next_token(lexer);
+        printf("%s('%s') ", token_type_to_string(token.type), token.text);
+    } while (token.type != TOKEN_EOF);
     printf("\n");
 }
 
-void tokens_append(Tokens *tokens, Token token) {
-    const size_t alloc_capacity = 10;
-    if (tokens->size >= tokens->capacity) {
-        if (tokens->size == 0) {
-            tokens->data = malloc(alloc_capacity*sizeof(Token));
-        } else {
-            tokens->data = realloc(tokens->data ,(tokens->size+alloc_capacity)*sizeof(Token));
-        }
-        tokens->capacity = tokens->capacity + alloc_capacity;
-    }
-    tokens->data[tokens->size] = token;
-    tokens->size++;
+// TODO: remove this @archive
+// void tokens_append(Tokens *tokens, Token token) {
+//     const size_t alloc_capacity = 10;
+//     if (tokens->size >= tokens->capacity) {
+//         if (tokens->size == 0) {
+//             tokens->data = malloc(alloc_capacity*sizeof(Token));
+//         } else {
+//             tokens->data = realloc(tokens->data ,(tokens->size+alloc_capacity)*sizeof(Token));
+//         }
+//         tokens->capacity = tokens->capacity + alloc_capacity;
+//     }
+//     tokens->data[tokens->size] = token;
+//     tokens->size++;
+// }
+
+inline char lexer_current_char(Lexer *lexer) {
+    return lexer->source[lexer->pos];
 }
 
-Tokens tokenize(char* source) {
-    Tokens tokens = {0};
-    size_t i = 0;
-    while (i < strlen(source)) {
-        if (isdigit(source[i])) {
-            char number_buffer[FIXED_STRING_SIZE] = "";
-            while (isdigit(source[i])) {
-                strncat(number_buffer, &source[i], 1);
-                i++;
-            }
-            Token token = { .type = TOKEN_NUMBER };
-            strcpy(token.text, number_buffer);
-            tokens_append(&tokens, token);
-            i--;
-        } else if (isalpha(source[i])) {
-            // collect alphanumeric chars into the buffer
-            char buffer[FIXED_STRING_SIZE] = "";
-            size_t first = i;
-            while (isalpha(source[i]) || (i > first && (isalpha(source[i]) || isdigit(source[i])))) {
-                strncat(buffer, &source[i], 1);
-                i++;
-            }
-
-            // when the buffer matches a keyword this will become one identifier token
-            // if (!strcmp(buffer, "sqrt") || !strcmp(buffer, "sin") || !strcmp(buffer, "cos") || !strcmp(buffer, "pi")) {
-            if (is_builtin_function(buffer) || is_builtin_constant(buffer)) {
-                Token token = { .type = TOKEN_IDENTIFIER };
-                strcpy(token.text, buffer);
-                tokens_append(&tokens, token);
-                i--;
-            // when not, every char becomes a seperate identifier token
-            } else {
-                i = first;
-                Token token = { .type = TOKEN_IDENTIFIER };
-                strncpy(token.text, &source[i], 1);
-                tokens_append(&tokens, token);
-            }
-        } else if (source[i] == '+') {
-            // TODO: Remove char -> text copy.
-            Token token = { .type = TOKEN_PLUS };
-            strncpy(token.text, &source[i], 1);
-            tokens_append(&tokens, token);
-        } else if (source[i] == '-') {
-            Token token = { .type = TOKEN_MINUS };
-            strncpy(token.text, &source[i], 1);
-            tokens_append(&tokens, token);
-        } else if (source[i] == '*') {
-            Token token = { .type = TOKEN_STAR };
-            strncpy(token.text, &source[i], 1);
-            tokens_append(&tokens, token);
-        } else if (source[i] == '/') {
-            Token token = { .type = TOKEN_SLASH };
-            strncpy(token.text, &source[i], 1);
-            tokens_append(&tokens, token);
-        } else if (source[i] == '^') {
-            Token token = { .type = TOKEN_CARET };
-            strncpy(token.text, &source[i], 1);
-            tokens_append(&tokens, token);
-        } else if (source[i] == '(') {
-            Token token = { .type = TOKEN_L_PAREN };
-            strncpy(token.text, &source[i], 1);
-            tokens_append(&tokens, token);
-        } else if (source[i] == ')') {
-            Token token = { .type = TOKEN_R_PAREN };
-            strncpy(token.text, &source[i], 1);
-            tokens_append(&tokens, token);
-        } else if (isspace(source[i])) {
-            // ignore spaces for now
-        } else if (source[i] == '#') {
-            Token token = { .type = TOKEN_HASH };
-            strncpy(token.text, &source[i], 1);
-            tokens_append(&tokens, token);
-        } else if (source[i] == ',') {
-            Token token = { .type = TOKEN_COMMA };
-            strncpy(token.text, &source[i], 1);
-            tokens_append(&tokens, token);
-        } else {
-            fprintf(stderr, "ERROR: Can't tokenize '%c'\n", source[i]);
-            exit(1);
-        }
-        i++;
+Token lexer_next_token(Lexer *lexer) {
+    if (lexer->pos == strlen(lexer->source)) {
+        return (Token) { .type=TOKEN_EOF };
     }
-    assert(i == strlen(source));
-    tokens_append(&tokens, (Token){ .type=TOKEN_EOF });
-    return tokens;
+
+    if (isdigit(lexer_current_char(lexer))) {
+        char number_buffer[FIXED_STRING_SIZE] = "";
+        while (isdigit(lexer_current_char(lexer))) {
+            char current_char = lexer_current_char(lexer);
+            strncat(number_buffer, &current_char, 1);
+            lexer->pos += 1;
+        }
+        Token token = { .type = TOKEN_NUMBER };
+        strcpy(token.text, number_buffer);
+        // lexer->pos -= 1;
+        return token;
+    } else if (isalpha(lexer_current_char(lexer))) {
+        // collect alphanumeric chars into the buffer
+        char buffer[FIXED_STRING_SIZE] = "";
+        size_t first = lexer->pos;
+        while (
+            isalpha(lexer_current_char(lexer)) ||
+            (lexer->pos > first && (isalpha(lexer_current_char(lexer)) ||
+            isdigit(lexer_current_char(lexer))))
+        ) {
+            char current_char = lexer_current_char(lexer);
+            strncat(buffer, &current_char, 1);
+            lexer->pos += 1;
+        }
+
+        // when the buffer matches a keyword this will become one identifier token
+        // if (!strcmp(buffer, "sqrt") || !strcmp(buffer, "sin") || !strcmp(buffer, "cos") || !strcmp(buffer, "pi")) {
+        if (is_builtin_function(buffer) || is_builtin_constant(buffer)) {
+            Token token = { .type = TOKEN_IDENTIFIER };
+            strcpy(token.text, buffer);
+            // lexer->pos -= 1;
+            return token;
+        // when not, every char becomes a seperate identifier token
+        } else {
+            lexer->pos = first;
+            Token token = { .type = TOKEN_IDENTIFIER };
+            char current_char = lexer_current_char(lexer);
+            strncpy(token.text, &current_char, 1);
+
+            lexer->pos += 1;
+            return token;
+        }
+    } else if (lexer_current_char(lexer) == '+') {
+        // TODO: Remove char -> text copy.
+        Token token = { .type = TOKEN_PLUS };
+        token.text[0] = lexer_current_char(lexer);
+        lexer->pos += 1;
+        // strncpy(token.text, &lexer_current_char(lexer), 1);
+        return token;
+    } else if (lexer_current_char(lexer) == '-') {
+        Token token = { .type = TOKEN_MINUS };
+        token.text[0] = lexer_current_char(lexer);
+        lexer->pos += 1;
+        // strncpy(token.text, &lexer_current_char(lexer), 1);
+        return token;
+    } else if (lexer_current_char(lexer) == '*') {
+        Token token = { .type = TOKEN_STAR };
+        token.text[0] = lexer_current_char(lexer);
+        lexer->pos += 1;
+        // strncpy(token.text, &lexer_current_char(lexer), 1);
+        return token;
+    } else if (lexer_current_char(lexer) == '/') {
+        Token token = { .type = TOKEN_SLASH };
+        token.text[0] = lexer_current_char(lexer);
+        lexer->pos += 1;
+        // strncpy(token.text, &lexer_current_char(lexer), 1);
+        return token;
+    } else if (lexer_current_char(lexer) == '^') {
+        Token token = { .type = TOKEN_CARET };
+        token.text[0] = lexer_current_char(lexer);
+        lexer->pos += 1;
+        // strncpy(token.text, &lexer_current_char(lexer), 1);
+        return token;
+    } else if (lexer_current_char(lexer) == '(') {
+        Token token = { .type = TOKEN_L_PAREN };
+        token.text[0] = lexer_current_char(lexer);
+        lexer->pos += 1;
+        // strncpy(token.text, &lexer_current_char(lexer), 1);
+        return token;
+    } else if (lexer_current_char(lexer) == ')') {
+        Token token = { .type = TOKEN_R_PAREN };
+        token.text[0] = lexer_current_char(lexer);
+        lexer->pos += 1;
+        // strncpy(token.text, &lexer_current_char(lexer), 1);
+        return token;
+    } else if (isspace(lexer_current_char(lexer))) {
+        // ignore spaces for now
+        lexer->pos += 1;
+        return lexer_next_token(lexer);
+    } else if (lexer_current_char(lexer) == '#') {
+        Token token = { .type = TOKEN_HASH };
+        token.text[0] = lexer_current_char(lexer);
+        lexer->pos += 1;
+        // strncpy(token.text, &lexer_current_char(lexer), 1);
+        return token;
+    } else if (lexer_current_char(lexer) == ',') {
+        Token token = { .type = TOKEN_COMMA };
+        token.text[0] = lexer_current_char(lexer);
+        lexer->pos += 1;
+        // strncpy(token.text, &lexer_current_char(lexer), 1);
+        return token;
+    } else {
+        fprintf(stderr, "ERROR: Can't tokenize '%c'\n", lexer_current_char(lexer));
+        exit(1);
+    }
+
+    assert(false); // unreachable
+    return (Token) { .type=TOKEN_EOF };
+}
+
+Token lexer_peek_token(Lexer *lexer) {
+    size_t old_pos = lexer->pos;
+    Token token = lexer_next_token(lexer);
+    lexer->pos = old_pos;
+    return token;
 }
 
 const char *token_type_to_string(TokenType type) {
@@ -154,6 +195,8 @@ const char *token_type_to_string(TokenType type) {
         case TOKEN_HASH: return "HASH";
         case TOKEN_COMMA: return "COMMA";
         case TOKEN_EOF: return "EOF";
-        default: assert(false);
+        default:
+            printf("%d\n", type); 
+            assert(false);
     }
 }

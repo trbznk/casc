@@ -352,10 +352,16 @@ AST* interp(AST* node) {
     }
 }
 
-AST* interp_from_string(char* input) {
-    Tokens tokens = tokenize(input);
-    Parser parser = { .tokens = tokens, .pos=0 };
+AST* interp_from_string(char *source) {
+    Lexer lexer;
+    lexer.source = source;
+    lexer.pos = 0;
+
+    Parser parser;
+    parser.lexer = lexer;
+
     AST* ast = parse(&parser);
     AST* output = interp(ast);
+    
     return output;
 }

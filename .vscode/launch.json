@@ -12,6 +12,18 @@
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb"
+        },
+        {
+            "name": "debug --test",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/casc",
+            "args": ["--test"],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb"
         }
     ]
 }

@@ -6,65 +6,69 @@
 
 #include "casc.h"
 
-void parser_expect(Parser* parser, TokenType type) {
-    if (parser->tokens.data[parser->pos].type == type) {
-        parser->pos++;
+void parser_eat(Parser* parser, TokenType type) {
+    if (lexer_peek_token(&parser->lexer).type == type) {
+        lexer_next_token(&parser->lexer);
     } else {
-        fprintf(stderr, "ERROR: Expected %s got %s.\n", token_type_to_string(type), token_type_to_string(parser->tokens.data[parser->pos].type));
+        fprintf(stderr, "ERROR: Expected %s got %s.\n", token_type_to_string(type), token_type_to_string(lexer_peek_token(&parser->lexer).type));
+        assert(false);
     }
 }
 
 AST *parse_exp(Parser* parser) {
-    Token current_token = parser->tokens.data[parser->pos];
-    if (current_token.type == TOKEN_NUMBER) {
-        parser_expect(parser, TOKEN_NUMBER);
-        return create_ast_integer(atoi(current_token.text));
-    } else if (current_token.type == TOKEN_IDENTIFIER) {
-        if (is_builtin_function(current_token.text)) {
-            parser_expect(parser, TOKEN_IDENTIFIER);
-            parser_expect(parser, TOKEN_L_PAREN);
+    Token token = lexer_peek_token(&parser->lexer);
 
-            ASTArray args = {0};
-            ast_array_append(&args, parse_expr(parser));
-            while (parser->tokens.data[parser->pos].type == TOKEN_COMMA) {
-                parser_expect(parser, TOKEN_COMMA);
+    switch (token.type) {
+        case TOKEN_NUMBER:
+            parser_eat(parser, TOKEN_NUMBER);
+            return create_ast_integer(atoi(token.text));
+        case TOKEN_IDENTIFIER:
+            if (is_builtin_function(token.text)) {
+                parser_eat(parser, TOKEN_IDENTIFIER);
+                parser_eat(parser, TOKEN_L_PAREN);
+
+                ASTArray args = {0};
                 ast_array_append(&args, parse_expr(parser));
-            }
+                while (lexer_peek_token(&parser->lexer).type == TOKEN_COMMA) {
+                    parser_eat(parser, TOKEN_COMMA);
+                    ast_array_append(&args, parse_expr(parser));
+                }
 
-            parser_expect(parser, TOKEN_R_PAREN);
-            return create_ast_func_call(current_token, args);
-        } else if (is_builtin_constant(current_token.text)) {
-            parser_expect(parser, TOKEN_IDENTIFIER);
-            return create_ast_constant(current_token);
-        } else {
-            parser_expect(parser, TOKEN_IDENTIFIER);
-            return create_ast_symbol(current_token);
-        }
-    } else if (current_token.type == TOKEN_L_PAREN) {
-        parser_expect(parser, TOKEN_L_PAREN);
-        AST* r = parse_expr(parser);
-        parser_expect(parser, TOKEN_R_PAREN);
-        return r;
-    } else if (current_token.type == TOKEN_MINUS) {
-        parser_expect(parser, TOKEN_MINUS);
-        return create_ast_unaryop(parse_factor(parser), OP_USUB);
-    } else if (current_token.type == TOKEN_PLUS) {
-        parser_expect(parser, TOKEN_PLUS);
-        return create_ast_unaryop(parse_factor(parser), OP_UADD);
-    } else if (current_token.type == TOKEN_EOF) {
-        // I think we can ignore EOF token for now and simply return it
-        return create_ast_empty();
-    } else {
-        printf("%s\n", token_type_to_string(current_token.type));
-        assert(false);
+                parser_eat(parser, TOKEN_R_PAREN);
+                return create_ast_func_call(token, args);
+            } else if (is_builtin_constant(token.text)) {
+                parser_eat(parser, TOKEN_IDENTIFIER);
+                return create_ast_constant(token);
+            } else {
+                parser_eat(parser, TOKEN_IDENTIFIER);
+                return create_ast_symbol(token);
+            }
+        case TOKEN_L_PAREN:
+            parser_eat(parser, TOKEN_L_PAREN);
+            AST* r = parse_expr(parser);
+            parser_eat(parser, TOKEN_R_PAREN);
+            return r;
+        case TOKEN_MINUS:
+            parser_eat(parser, TOKEN_MINUS);
+            return create_ast_unaryop(parse_factor(parser), OP_USUB);
+        case TOKEN_PLUS:
+            parser_eat(parser, TOKEN_PLUS);
+            return create_ast_unaryop(parse_factor(parser), OP_UADD);
+        case TOKEN_EOF:
+            // I think we can ignore EOF token for now and simply return it
+            return create_ast_empty();
+        default:
+            printf("%s\n", token_type_to_string(token.type));
+            assert(false);
     }
+
 }
 
 AST *parse_factor(Parser *parser) {
     AST* result = parse_exp(parser);
 
-     while (parser->tokens.data[parser->pos].type == TOKEN_CARET) {
-        parser_expect(parser, TOKEN_CARET);
+     while (lexer_peek_token(&parser->lexer).type == TOKEN_CARET) {
+        parser_eat(parser, TOKEN_CARET);
         // when we use the same hierachy pattern like in parse_term or parse_expr, we need to call
         // parse_expr here. But unlike with addition and multiplication we want to parse pow operation
         // from right to left (this is more common, e.g. desmos, python, ...). 
@@ -79,21 +83,28 @@ AST* parse_term(Parser* parser) {
     AST* result = parse_factor(parser);
 
     while (
-        parser->tokens.data[parser->pos].type == TOKEN_STAR ||
-        parser->tokens.data[parser->pos].type == TOKEN_SLASH ||
-        parser->tokens.data[parser->pos].type == TOKEN_IDENTIFIER ||
-        parser->tokens.data[parser->pos].type == TOKEN_L_PAREN
+        lexer_peek_token(&parser->lexer).type == TOKEN_STAR ||
+        lexer_peek_token(&parser->lexer).type == TOKEN_SLASH ||
+        lexer_peek_token(&parser->lexer).type == TOKEN_IDENTIFIER ||
+        lexer_peek_token(&parser->lexer).type == TOKEN_L_PAREN
     ) {
-        if (parser->tokens.data[parser->pos].type == TOKEN_STAR) {
-            parser_expect(parser, TOKEN_STAR);
-            result = create_ast_binop(result, parse_factor(parser), OP_MUL);
-        } else if (parser->tokens.data[parser->pos].type == TOKEN_SLASH) {
-            parser_expect(parser, TOKEN_SLASH);
-            result = create_ast_binop(result, parse_factor(parser), OP_DIV);
-        } else if (parser->tokens.data[parser->pos].type == TOKEN_IDENTIFIER) {
-            result = create_ast_binop(result, parse_factor(parser), OP_MUL);
-        } else if (parser->tokens.data[parser->pos].type == TOKEN_L_PAREN) {
-            result = create_ast_binop(result, parse_exp(parser), OP_MUL);
+        switch (lexer_peek_token(&parser->lexer).type) {
+            case TOKEN_STAR:
+                parser_eat(parser, TOKEN_STAR);
+                result = create_ast_binop(result, parse_factor(parser), OP_MUL);
+                break;
+            case TOKEN_SLASH:
+                parser_eat(parser, TOKEN_SLASH);
+                result = create_ast_binop(result, parse_factor(parser), OP_DIV);
+                break;
+            case TOKEN_IDENTIFIER:
+                result = create_ast_binop(result, parse_factor(parser), OP_MUL);
+                break;
+            case TOKEN_L_PAREN:
+                result = create_ast_binop(result, parse_exp(parser), OP_MUL);
+                break;
+            default:
+                assert(false);
         }
     }
 
@@ -103,13 +114,12 @@ AST* parse_term(Parser* parser) {
 AST* parse_expr(Parser* parser) {
     AST* result = parse_term(parser);
 
-    assert(parser->pos < parser->tokens.size);
-    while (parser->tokens.data[parser->pos].type == TOKEN_PLUS || parser->tokens.data[parser->pos].type == TOKEN_MINUS) {
-        if (parser->tokens.data[parser->pos].type == TOKEN_PLUS) {
-            parser_expect(parser, TOKEN_PLUS);
+    while (lexer_peek_token(&parser->lexer).type == TOKEN_PLUS || lexer_peek_token(&parser->lexer).type == TOKEN_MINUS) {
+        if (lexer_peek_token(&parser->lexer).type == TOKEN_PLUS) {
+            parser_eat(parser, TOKEN_PLUS);
             result = create_ast_binop(result, parse_term(parser), OP_ADD);
-        } else if (parser->tokens.data[parser->pos].type == TOKEN_MINUS) {
-            parser_expect(parser, TOKEN_MINUS);
+        } else if (lexer_peek_token(&parser->lexer).type == TOKEN_MINUS) {
+            parser_eat(parser, TOKEN_MINUS);
             result = create_ast_binop(result, parse_term(parser), OP_SUB);
         }
     }
@@ -119,14 +129,16 @@ AST* parse_expr(Parser* parser) {
 
 AST* parse(Parser *parser) {
     AST* result = parse_expr(parser);
-    assert(parser->tokens.data[parser->pos].type == TOKEN_EOF);
+    assert(lexer_peek_token(&parser->lexer).type == TOKEN_EOF);
     return result;
 }
 
-AST* parse_from_string(char* input) {
-    Tokens tokens = tokenize(input);
-    Parser parser = { .tokens = tokens, .pos=0 };
+AST* parse_from_string(char* source) {
+    Lexer lexer = { .source=source, .pos=0 };
+
+    Parser parser;
+    parser.lexer = lexer;
+
     AST* ast = parse(&parser);
     return ast;
 }
-
