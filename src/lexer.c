@@ -40,21 +40,6 @@ void lexer_print_tokens(Lexer *lexer) {
     printf("\n");
 }
 
-// TODO: remove this @archive
-// void tokens_append(Tokens *tokens, Token token) {
-//     const size_t alloc_capacity = 10;
-//     if (tokens->size >= tokens->capacity) {
-//         if (tokens->size == 0) {
-//             tokens->data = malloc(alloc_capacity*sizeof(Token));
-//         } else {
-//             tokens->data = realloc(tokens->data ,(tokens->size+alloc_capacity)*sizeof(Token));
-//         }
-//         tokens->capacity = tokens->capacity + alloc_capacity;
-//     }
-//     tokens->data[tokens->size] = token;
-//     tokens->size++;
-// }
-
 inline char lexer_current_char(Lexer *lexer) {
     return lexer->source[lexer->pos];
 }
@@ -73,7 +58,6 @@ Token lexer_next_token(Lexer *lexer) {
         }
         Token token = { .type = TOKEN_NUMBER };
         strcpy(token.text, number_buffer);
-        // lexer->pos -= 1;
         return token;
     } else if (isalpha(lexer_current_char(lexer))) {
         // collect alphanumeric chars into the buffer
@@ -89,12 +73,9 @@ Token lexer_next_token(Lexer *lexer) {
             lexer->pos += 1;
         }
 
-        // when the buffer matches a keyword this will become one identifier token
-        // if (!strcmp(buffer, "sqrt") || !strcmp(buffer, "sin") || !strcmp(buffer, "cos") || !strcmp(buffer, "pi")) {
         if (is_builtin_function(buffer) || is_builtin_constant(buffer)) {
             Token token = { .type = TOKEN_IDENTIFIER };
             strcpy(token.text, buffer);
-            // lexer->pos -= 1;
             return token;
         // when not, every char becomes a seperate identifier token
         } else {
@@ -111,43 +92,36 @@ Token lexer_next_token(Lexer *lexer) {
         Token token = { .type = TOKEN_PLUS };
         token.text[0] = lexer_current_char(lexer);
         lexer->pos += 1;
-        // strncpy(token.text, &lexer_current_char(lexer), 1);
         return token;
     } else if (lexer_current_char(lexer) == '-') {
         Token token = { .type = TOKEN_MINUS };
         token.text[0] = lexer_current_char(lexer);
         lexer->pos += 1;
-        // strncpy(token.text, &lexer_current_char(lexer), 1);
         return token;
     } else if (lexer_current_char(lexer) == '*') {
         Token token = { .type = TOKEN_STAR };
         token.text[0] = lexer_current_char(lexer);
         lexer->pos += 1;
-        // strncpy(token.text, &lexer_current_char(lexer), 1);
         return token;
     } else if (lexer_current_char(lexer) == '/') {
         Token token = { .type = TOKEN_SLASH };
         token.text[0] = lexer_current_char(lexer);
         lexer->pos += 1;
-        // strncpy(token.text, &lexer_current_char(lexer), 1);
         return token;
     } else if (lexer_current_char(lexer) == '^') {
         Token token = { .type = TOKEN_CARET };
         token.text[0] = lexer_current_char(lexer);
         lexer->pos += 1;
-        // strncpy(token.text, &lexer_current_char(lexer), 1);
         return token;
     } else if (lexer_current_char(lexer) == '(') {
         Token token = { .type = TOKEN_L_PAREN };
         token.text[0] = lexer_current_char(lexer);
         lexer->pos += 1;
-        // strncpy(token.text, &lexer_current_char(lexer), 1);
         return token;
     } else if (lexer_current_char(lexer) == ')') {
         Token token = { .type = TOKEN_R_PAREN };
         token.text[0] = lexer_current_char(lexer);
         lexer->pos += 1;
-        // strncpy(token.text, &lexer_current_char(lexer), 1);
         return token;
     } else if (isspace(lexer_current_char(lexer))) {
         // ignore spaces for now
@@ -157,13 +131,11 @@ Token lexer_next_token(Lexer *lexer) {
         Token token = { .type = TOKEN_HASH };
         token.text[0] = lexer_current_char(lexer);
         lexer->pos += 1;
-        // strncpy(token.text, &lexer_current_char(lexer), 1);
         return token;
     } else if (lexer_current_char(lexer) == ',') {
         Token token = { .type = TOKEN_COMMA };
         token.text[0] = lexer_current_char(lexer);
         lexer->pos += 1;
-        // strncpy(token.text, &lexer_current_char(lexer), 1);
         return token;
     } else {
         fprintf(stderr, "ERROR: Can't tokenize '%c'\n", lexer_current_char(lexer));

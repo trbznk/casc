@@ -1,22 +1,19 @@
+// TODO: maybe there shouldnt be ASTConstant. Just AST Symbol
+// TODO: remove Token fields from AST nodes
+
 #ifndef CASC_H
 #define CASC_H
 
 #include <stdlib.h>
 
 //
-// general
+// forward declarations
 //
 
-typedef struct Allocator Allocator;
-
-struct Allocator {
-    void *memory;
-    size_t head;
-};
-
-Allocator create_allocator(size_t);
-void allocator_free(Allocator*);
-void *mmalloc(Allocator*, size_t);
+typedef struct AST AST;
+typedef struct Parser Parser;
+typedef struct Arena Arena;
+typedef struct Worker Worker;
 
 //
 // lexer
@@ -80,7 +77,12 @@ bool is_builtin_constant(char*);
 // ast
 //
 
-typedef struct AST AST;
+#define INTEGER(value) create_ast_integer(&w->arena, value)
+#define ADD(left, right) create_ast_binop(&w->arena, left, right, OP_ADD)
+#define SUB(left, right) create_ast_binop(&w->arena, left, right, OP_SUB)
+#define MUL(left, right) create_ast_binop(&w->arena, left, right, OP_MUL)
+#define DIV(left, right) create_ast_binop(&w->arena, left, right, OP_DIV)
+
 typedef struct ASTArray ASTArray;
 
 typedef enum {
@@ -128,7 +130,7 @@ struct AST {
         struct {
             Token name;
         } symbol;
-        
+ 
         struct {
             Token name;
         } constant;
@@ -153,13 +155,13 @@ struct AST {
     };
 };
 
-AST* create_ast_integer(int64_t);
-AST* create_ast_symbol(Token);
-AST* create_ast_constant(Token);
-AST* create_ast_binop(AST*, AST*, OpType);
-AST* create_ast_unaryop(AST*, OpType);
-AST* create_ast_func_call(Token, ASTArray);
-AST* create_ast_empty();
+AST* create_ast_integer(Arena*, int64_t);
+AST* create_ast_symbol(Arena*, Token);
+AST* create_ast_constant(Arena*, Token);
+AST* create_ast_binop(Arena*, AST*, AST*, OpType);
+AST* create_ast_unaryop(Arena*, AST*, OpType);
+AST* create_ast_func_call(Arena*, Token, ASTArray);
+AST* create_ast_empty(Arena*);
 
 void ast_array_append(ASTArray*, AST*);
 
@@ -171,25 +173,20 @@ const char* ast_type_to_debug_string(ASTType);
 // parser
 //
 
-typedef struct Parser Parser;
+AST* parse(Worker*);
+AST* parse_expr(Worker*);
+AST* parse_factor(Worker*);
 
-struct Parser {
-    Lexer lexer;
-};
-
-AST* parse(Parser*);
-AST* parse_expr(Parser*);
-AST* parse_factor(Parser*);
-AST* parse_from_string(char*);
+AST* parse_from_string(Worker*, char*);
 
 //
 // interp
 //
 
-AST *interp(AST*);
-AST *interp_binop_pow(AST*);
+AST *interp(Worker*, AST*);
+AST *interp_binop_pow(Worker*, AST*);
 
-AST* interp_from_string(char*);
+AST* interp_from_string(Worker*, char*);
 
 bool ast_match(AST*, AST*);
 bool ast_match_type(AST*, AST*);
@@ -201,5 +198,26 @@ char *ast_to_debug_string(AST*);
 // gui
 //
 void init_gui();
+
+//
+// general
+//
+
+struct Arena {
+    void *memory;
+    size_t offset;
+    size_t size;
+};
+
+Arena create_arena(size_t);
+void arena_free(Arena*);
+void *arena_alloc(Arena*, size_t);
+
+struct Worker {
+    Arena arena;
+    Lexer lexer;
+};
+
+Worker create_worker();
 
 #endif

@@ -85,14 +85,11 @@ void init_gui() {
                 cursor_position++;
             }
         } else if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_ENTER)) {
-            Lexer lexer = { .source=cell_input_buffer, .pos=0 };
 
-            Parser parser;
-            parser.lexer = lexer;
-
-            AST* ast = parse_expr(&parser);
-            AST* output = interp(ast);
+            Worker w = create_worker();
+            AST* output = interp_from_string(&w, cell_input_buffer);
             cell_output_buffer = ast_to_string(output);
+            
         }
 
         //
