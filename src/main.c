@@ -8,7 +8,7 @@
 
 #include "casc.h"
 
-#define ARENA_SIZE 40*1024
+#define ARENA_SIZE 60*1024
 
 Arena create_arena(size_t size) {
     return (Arena){ .memory=malloc(size), .offset=0, .size=size };
@@ -33,7 +33,7 @@ void *arena_alloc(Arena *arena, size_t size) {
     arena->offset = arena->offset + size;
 
     double arena_memory_used = (double)arena->offset / (double)arena->size;
-    assert(arena_memory_used < 0.1);
+    assert(arena_memory_used < 0.5);
     assert(arena->offset < arena->size);
 #if 0
     printf("arena_memory_used = %.2f\n", arena_memory_used);
@@ -53,12 +53,14 @@ void test_ast(char *source, char *test_source) {
 
     static size_t test_counter = 1;
 
-    Worker w = create_worker();
-    w.lexer.source = source;
+    Worker _w = create_worker();
+    Worker *w = &_w;
 
-    AST* output = parse(&w);
+    w->lexer.source = source;
 
-    output = interp(&w, output);
+    AST* output = parse(w);
+
+    output = interp(w, output);
 
     printf("test %02zu ... ", test_counter);
 
@@ -79,7 +81,7 @@ void test_ast(char *source, char *test_source) {
         printf("OK\n");
     }
 
-    arena_free(&w.arena);
+    arena_free(&w->arena);
 
     test_counter += 1;
 }
@@ -215,15 +217,16 @@ int main(int argc, char *argv[]) {
     }
 
     if (do_cli) {
-        Worker w = create_worker();
+        Worker _w = create_worker();
+        Worker *w = &_w;
 
         char *source = "(-x)^2";
-        AST *output = interp_from_string(&w, source);
+        AST *output = interp_from_string(w, source);
 
         printf("%s\n", ast_to_string(output));
         printf("%s\n", ast_to_debug_string(output));
 
-        arena_free(&w.arena);
+        arena_free(&w->arena);
     } else if (do_gui) {
         init_gui();
     } else {

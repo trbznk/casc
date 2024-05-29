@@ -43,11 +43,6 @@ bool ast_match(AST* left, AST* right) {
     return false;
 }
 
-bool ast_match_string(AST *left, char *right_string) {
-    char *left_string = ast_to_string(left);
-    return !strcmp(left_string, right_string);
-}
-
 bool ast_match_type(AST *left, AST *right) {
     if (left->type != right->type) {
         return false;
@@ -94,9 +89,9 @@ char *ast_to_debug_string(AST* node) {
     return output;
 }
 
-char *_ast_to_string(AST* node, uint8_t op_precedence) {
+char *_ast_to_string(Arena *arena, AST* node, uint8_t op_precedence) {
     // TODO: parse arena here for the malloc
-    char *output = malloc(1024);
+    char *output = arena_alloc(arena, 1024);
     switch (node->type) {
         case AST_INTEGER: sprintf(output, "%lld", node->integer.value); break;
         case AST_SYMBOL:
@@ -105,8 +100,8 @@ char *_ast_to_string(AST* node, uint8_t op_precedence) {
 
             uint8_t current_op_precedence = op_type_precedence(node->binop.type);
 
-            char *left_string = _ast_to_string(node->binop.left, current_op_precedence);
-            char *right_string = _ast_to_string(node->binop.right, current_op_precedence);
+            char *left_string = _ast_to_string(arena, node->binop.left, current_op_precedence);
+            char *right_string = _ast_to_string(arena, node->binop.right, current_op_precedence);
             const char *op_type_string = op_type_to_string(node->binop.type);
 
             if (current_op_precedence < op_precedence) {
@@ -120,7 +115,7 @@ char *_ast_to_string(AST* node, uint8_t op_precedence) {
         case AST_UNARYOP: {
             uint8_t current_op_precedence = op_type_precedence(node->binop.type);
 
-            char *expr_string = _ast_to_string(node->unaryop.expr, op_precedence);
+            char *expr_string = _ast_to_string(arena, node->unaryop.expr, op_precedence);
             const char *op_type_string = op_type_to_string(node->unaryop.type);
 
             if (current_op_precedence < op_precedence) {
@@ -132,7 +127,7 @@ char *_ast_to_string(AST* node, uint8_t op_precedence) {
         }
         case AST_FUNC_CALL: {
             if (node->func_call.args.size == 1) {
-                sprintf(output, "%s(%s)", node->func_call.name.text, _ast_to_string(node->func_call.args.data[0], op_precedence)); break;
+                sprintf(output, "%s(%s)", node->func_call.name.text, _ast_to_string(arena, node->func_call.args.data[0], op_precedence)); break;
             } else {
                 // TODO: multiple args to string
                 sprintf(output, "%s(args)", node->func_call.name.text); break;

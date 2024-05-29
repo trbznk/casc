@@ -184,13 +184,13 @@ AST *interp_binop_pow(Worker*, AST*);
 AST* interp_from_string(Worker*, char*);
 
 bool ast_match(AST*, AST*);
-bool ast_match_string(AST*, char*);
 bool ast_match_type(AST*, AST*);
 
-char *_ast_to_string(AST*, uint8_t);
+char *_ast_to_string(Arena*, AST*, uint8_t);
 char *ast_to_debug_string(AST*);
 
-#define ast_to_string(ast) _ast_to_string(ast, 0)
+#define ast_to_string(ast) _ast_to_string(&w->arena, ast, 0)
+#define ast_match_string(ast, s) (bool)!strcmp(_ast_to_string(&w->arena, ast, 0), s)
 
 //
 // gui
