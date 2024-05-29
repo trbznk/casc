@@ -101,7 +101,6 @@ typedef enum {
 typedef enum {
     AST_INTEGER,
     AST_SYMBOL,
-    AST_CONSTANT,
     AST_BINOP,
     AST_UNARYOP,
 
@@ -128,12 +127,8 @@ struct AST {
         } integer;
 
         struct {
-            Token name;
+            char* name;
         } symbol;
- 
-        struct {
-            Token name;
-        } constant;
 
         struct {
             AST* left;
@@ -156,8 +151,7 @@ struct AST {
 };
 
 AST* create_ast_integer(Arena*, int64_t);
-AST* create_ast_symbol(Arena*, Token);
-AST* create_ast_constant(Arena*, Token);
+AST* create_ast_symbol(Arena*, char*);
 AST* create_ast_binop(Arena*, AST*, AST*, OpType);
 AST* create_ast_unaryop(Arena*, AST*, OpType);
 AST* create_ast_func_call(Arena*, Token, ASTArray);

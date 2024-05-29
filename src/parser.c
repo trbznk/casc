@@ -36,12 +36,9 @@ AST *parse_exp(Worker* w) {
 
                 parser_eat(w, TOKEN_R_PAREN);
                 return create_ast_func_call(&w->arena, token, args);
-            } else if (is_builtin_constant(token.text)) {
-                parser_eat(w, TOKEN_IDENTIFIER);
-                return create_ast_constant(&w->arena, token);
             } else {
                 parser_eat(w, TOKEN_IDENTIFIER);
-                return create_ast_symbol(&w->arena, token);
+                return create_ast_symbol(&w->arena, token.text);
             }
         case TOKEN_L_PAREN:
             parser_eat(w, TOKEN_L_PAREN);

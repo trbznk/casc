@@ -19,9 +19,7 @@ bool ast_match(AST* left, AST* right) {
             case AST_INTEGER:
                 return left->integer.value == right->integer.value;
             case AST_SYMBOL:
-                return !strcmp(left->symbol.name.text, right->symbol.name.text);
-            case AST_CONSTANT:
-                return !strcmp(left->constant.name.text, right->constant.name.text);
+                return !strcmp(left->symbol.name, right->symbol.name);
             case AST_BINOP:
                 return ast_match(left->binop.left, right->binop.left) && ast_match(left->binop.right, right->binop.right);
             case AST_FUNC_CALL: {
@@ -73,8 +71,7 @@ char *ast_to_debug_string(AST* node) {
     char *output = malloc(1024);
     switch (node->type) {
         case AST_INTEGER: sprintf(output, "%s(%lld)", ast_type_to_debug_string(node->type), node->integer.value); break;
-        case AST_SYMBOL: sprintf(output, "%s(%s)", ast_type_to_debug_string(node->type), node->symbol.name.text); break;
-        case AST_CONSTANT: sprintf(output, "%s(%s)", ast_type_to_debug_string(node->type), node->constant.name.text); break;
+        case AST_SYMBOL: sprintf(output, "%s(%s)", ast_type_to_debug_string(node->type), node->symbol.name); break;
         case AST_BINOP: sprintf(output, "%s(%s, %s)", op_type_to_debug_string(node->binop.type), ast_to_debug_string(node->binop.left), ast_to_debug_string(node->binop.right)); break;
         case AST_UNARYOP: sprintf(output, "%s(%s)", op_type_to_debug_string(node->unaryop.type), ast_to_debug_string(node->unaryop.expr)); break;
         // TODO: args to debug string
@@ -91,8 +88,7 @@ char *ast_to_string(AST* node) {
     switch (node->type) {
         case AST_INTEGER: sprintf(output, "%lld", node->integer.value); break;
         case AST_SYMBOL:
-        case AST_CONSTANT:
-            sprintf(output, "%s", node->symbol.name.text); break;
+            sprintf(output, "%s", node->symbol.name); break;
         case AST_BINOP: {
             sprintf(output, "(%s%s%s)", ast_to_string(node->binop.left), op_type_to_string(node->binop.type), ast_to_string(node->binop.right));
             break;
@@ -302,7 +298,7 @@ AST* interp_func_call(Worker *w, AST* node) {
             }
         }
     } else if (!strcmp(name.text, "ln")) {
-        if (ast_match(arg, create_ast_symbol(&w->arena, (Token){ .text="e" }))) {
+        if (ast_match(arg, create_ast_symbol(&w->arena, "e"))) {
             return create_ast_integer(&w->arena, 1);
         } else if (ast_match(arg, create_ast_integer(&w->arena, 1))) {
             return create_ast_integer(&w->arena, 0);
@@ -346,7 +342,6 @@ AST* interp(Worker *w, AST* node) {
             return interp_unaryop(w, node);
         case AST_INTEGER:
         case AST_SYMBOL:
-        case AST_CONSTANT:
             return node;
         case AST_FUNC_CALL:
             return interp_func_call(w, node);

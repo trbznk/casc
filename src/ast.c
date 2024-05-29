@@ -33,7 +33,6 @@ const char* ast_type_to_debug_string(ASTType type) {
     switch (type) {
         case AST_INTEGER: return "Integer";
         case AST_SYMBOL: return "Symbol";
-        case AST_CONSTANT: return "Constant";
         case AST_BINOP: return "BinOp";
         case AST_UNARYOP: return "UnaryOp";
         case AST_FUNC_CALL: return "FuncCall";
@@ -59,17 +58,10 @@ AST* create_ast_integer(Arena* arena, int64_t value) {
     return node;
 }
 
-AST* create_ast_symbol(Arena* arena, Token name) {
+AST* create_ast_symbol(Arena* arena, char *name) {
     AST *node = arena_alloc(arena, sizeof(AST));
     node->type = AST_SYMBOL;
     node->symbol.name = name;
-    return node;
-}
-
-AST* create_ast_constant(Arena* arena, Token name) {
-    AST *node = arena_alloc(arena, sizeof(AST));
-    node->type = AST_CONSTANT;
-    node->constant.name = name;
     return node;
 }
 
