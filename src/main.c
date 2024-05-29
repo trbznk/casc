@@ -8,8 +8,7 @@
 
 #include "casc.h"
 
-#define VERBOSE 0
-#define ARENA_SIZE 100*1024
+#define ARENA_SIZE 40*1024
 
 Arena create_arena(size_t size) {
     return (Arena){ .memory=malloc(size), .offset=0, .size=size };
@@ -27,9 +26,19 @@ void arena_free(Arena *arena) {
 }
 
 void *arena_alloc(Arena *arena, size_t size) {
+    // current position in the memory
     void *memory = arena->memory + arena->offset;
+
+    // compute the new position in the memory
     arena->offset = arena->offset + size;
+
+    double arena_memory_used = (double)arena->offset / (double)arena->size;
+    assert(arena_memory_used < 0.1);
     assert(arena->offset < arena->size);
+#if 0
+    printf("arena_memory_used = %.2f\n", arena_memory_used);
+#endif
+
     return memory;
 }
 
@@ -42,10 +51,6 @@ Worker create_worker() {
 
 void test_ast(char *source, char *test_source) {
 
-#if VERBOSE
-    printf("source='%s'\n", source);
-#endif
-
     static size_t test_counter = 1;
 
     Worker w = create_worker();
@@ -56,12 +61,19 @@ void test_ast(char *source, char *test_source) {
     output = interp(&w, output);
 
     printf("test %02zu ... ", test_counter);
+
+    char *output_string = ast_to_string(output);
     
-    if (strcmp(ast_to_string(output), test_source)) {
+    if (strcmp(output_string, test_source) != 0) {
         printf("FAILED\n");
-        printf("%s\n", ast_to_string(output));
+
+#if 0
+        printf("source='%s'\n", source);
+#endif
+        
+        printf("'%s'\n", output_string);
         printf("!=\n");
-        printf("%s\n", test_source);
+        printf("'%s'\n", test_source);
         // exit(1);
     } else { 
         printf("OK\n");
@@ -92,7 +104,7 @@ void test() {
     test_ast("5 - - - + - (3 + 4) - +2", "10");
 
     // things from the sympy tutorial
-    test_ast("sqrt(8)", "(2*sqrt(2))");
+    test_ast("sqrt(8)", "2*sqrt(2)");
     // TEST_SOURCE_TO_INTERP("sqrt(8)", create_ast_binop(create_ast_integer(2), create_ast_func_call((Token){ .text="sqrt" }, create_ast_integer(2)), OP_MUL));
 
     // misc
@@ -109,7 +121,7 @@ void test() {
     test_ast("cos(pi)^2+1", "2");
     test_ast("x^0", "1");
     test_ast("x^1", "x");
-    test_ast("1/8 * (-4-2*4/3-1)", "(-23/24)");
+    test_ast("1/8 * (-4-2*4/3-1)", "-23/24");
     test_ast("a+0", "a");
     test_ast("0+a", "a");
     test_ast("a-0", "a");
@@ -118,6 +130,8 @@ void test() {
     test_ast("ln(1)", "0");
     test_ast("log(1, 10)", "0");
     test_ast("log(10, 10)", "1");
+    test_ast("-x^2", "-x^2");
+    test_ast("(-x)^2", "(-x)^2");
 
     // auto generated
     test_ast("48+-75", "-27");
@@ -201,12 +215,15 @@ int main(int argc, char *argv[]) {
     }
 
     if (do_cli) {
-        printf("casc\n");
-        Worker worker = create_worker();
-        char *source = "ln(e)";
-        // char *source = "1/3 * sin(pi) - cos(pi/2)";
-        AST *output = interp_from_string(&worker, source);
+        Worker w = create_worker();
+
+        char *source = "(-x)^2";
+        AST *output = interp_from_string(&w, source);
+
+        printf("%s\n", ast_to_string(output));
         printf("%s\n", ast_to_debug_string(output));
+
+        arena_free(&w.arena);
     } else if (do_gui) {
         init_gui();
     } else {

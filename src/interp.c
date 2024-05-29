@@ -43,6 +43,11 @@ bool ast_match(AST* left, AST* right) {
     return false;
 }
 
+bool ast_match_string(AST *left, char *right_string) {
+    char *left_string = ast_to_string(left);
+    return !strcmp(left_string, right_string);
+}
+
 bool ast_match_type(AST *left, AST *right) {
     if (left->type != right->type) {
         return false;
@@ -75,14 +80,21 @@ char *ast_to_debug_string(AST* node) {
         case AST_BINOP: sprintf(output, "%s(%s, %s)", op_type_to_debug_string(node->binop.type), ast_to_debug_string(node->binop.left), ast_to_debug_string(node->binop.right)); break;
         case AST_UNARYOP: sprintf(output, "%s(%s)", op_type_to_debug_string(node->unaryop.type), ast_to_debug_string(node->unaryop.expr)); break;
         // TODO: args to debug string
-        case AST_FUNC_CALL: sprintf(output, "%s(args)", node->func_call.name.text); break;
+        case AST_FUNC_CALL: {
+            if (node->func_call.args.size == 1) {
+                sprintf(output, "FuncCall(%s, %s)", node->func_call.name.text, ast_to_debug_string(node->func_call.args.data[0])); break;
+            } else {
+                // TODO: multiple args to string
+                sprintf(output, "FuncCall(%s, args)", node->func_call.name.text); break;
+            }
+        }
         case AST_EMPTY: sprintf(output, "Empty()"); break;
         default: fprintf(stderr, "ERROR: Cannot do 'ast_to_debug_string' because node type '%s' is not implemented.\n", ast_type_to_debug_string(node->type)); exit(1);
     }
     return output;
 }
 
-char *ast_to_string(AST* node) {
+char *_ast_to_string(AST* node, uint8_t op_precedence) {
     // TODO: parse arena here for the malloc
     char *output = malloc(1024);
     switch (node->type) {
@@ -90,13 +102,37 @@ char *ast_to_string(AST* node) {
         case AST_SYMBOL:
             sprintf(output, "%s", node->symbol.name); break;
         case AST_BINOP: {
-            sprintf(output, "(%s%s%s)", ast_to_string(node->binop.left), op_type_to_string(node->binop.type), ast_to_string(node->binop.right));
+
+            uint8_t current_op_precedence = op_type_precedence(node->binop.type);
+
+            char *left_string = _ast_to_string(node->binop.left, current_op_precedence);
+            char *right_string = _ast_to_string(node->binop.right, current_op_precedence);
+            const char *op_type_string = op_type_to_string(node->binop.type);
+
+            if (current_op_precedence < op_precedence) {
+                sprintf(output, "(%s%s%s)", left_string, op_type_string, right_string);
+            } else {
+                sprintf(output, "%s%s%s", left_string, op_type_string, right_string);
+            }
+
             break;
         }
-        case AST_UNARYOP: sprintf(output, "%s%s", op_type_to_string(node->unaryop.type), ast_to_string(node->unaryop.expr)); break;
+        case AST_UNARYOP: {
+            uint8_t current_op_precedence = op_type_precedence(node->binop.type);
+
+            char *expr_string = _ast_to_string(node->unaryop.expr, op_precedence);
+            const char *op_type_string = op_type_to_string(node->unaryop.type);
+
+            if (current_op_precedence < op_precedence) {
+                sprintf(output, "(%s%s)", op_type_string, expr_string); break;
+            } else {
+                sprintf(output, "%s%s", op_type_string, expr_string); break;
+            }
+            
+        }
         case AST_FUNC_CALL: {
             if (node->func_call.args.size == 1) {
-                sprintf(output, "%s(%s)", node->func_call.name.text, ast_to_string(node->func_call.args.data[0])); break;
+                sprintf(output, "%s(%s)", node->func_call.name.text, _ast_to_string(node->func_call.args.data[0], op_precedence)); break;
             } else {
                 // TODO: multiple args to string
                 sprintf(output, "%s(args)", node->func_call.name.text); break;
@@ -134,12 +170,10 @@ AST* interp_binop_add(Worker *w, AST* node) {
             AST* new_left = interp_binop(w, create_ast_binop(&w->arena, create_ast_integer(&w->arena, 1), left->binop.left, OP_ADD));
             return create_ast_binop(&w->arena, new_left, right, OP_MUL);
         }
-    } else if (ast_match(left, create_ast_integer(&w->arena, 0)) || ast_match(right, create_ast_integer(&w->arena, 0))) {
-        if (ast_match(left, create_ast_integer(&w->arena, 0))) {
-            return right;
-        } else {
-            return left;
-        }
+    } else if (ast_match(left, INTEGER(0))) {
+        return right;
+    } else if (ast_match(right, INTEGER(0))) {
+        return left;
     }
     return create_ast_binop(&w->arena, left, right, OP_ADD);
 }
@@ -317,18 +351,15 @@ AST* interp_func_call(Worker *w, AST* node) {
         } else {
             assert(false);
         }
+    } else if (ast_match_string(node, "sin(pi)")) {
+        return create_ast_integer(&w->arena, 0);
+    } else if (ast_match_string(node, "cos(0)")) {
+        return create_ast_integer(&w->arena, 1);
+    } else if (ast_match_string(node, "cos(pi/2)")) {
+        return create_ast_integer(&w->arena, 0);
+    } else if (ast_match_string(node, "cos(pi)")) {
+        return create_ast_integer(&w->arena, -1);
     }
-
-    // TODO: bring them back
-    // } else if (ast_match(node, parse_from_string(w, "sin(pi)"))) {
-    //     return create_ast_integer(&w->arena, 0);
-    // } else if (ast_match(node, parse_from_string(w, "cos(0)"))) {
-    //     return create_ast_integer(&w->arena, 1);
-    // } else if (ast_match(node, parse_from_string(w, "cos(pi/2)"))) {
-    //     return create_ast_integer(&w->arena, 0);
-    // } else if (ast_match(node, parse_from_string(w, "cos(pi)"))) {
-    //     return create_ast_integer(&w->arena, -1);
-    // }
 
     return node;
 }

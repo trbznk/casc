@@ -162,6 +162,7 @@ void ast_array_append(ASTArray*, AST*);
 const char* op_type_to_debug_string(OpType);
 const char* op_type_to_string(OpType);
 const char* ast_type_to_debug_string(ASTType);
+uint8_t op_type_precedence(OpType); 
 
 //
 // parser
@@ -183,10 +184,13 @@ AST *interp_binop_pow(Worker*, AST*);
 AST* interp_from_string(Worker*, char*);
 
 bool ast_match(AST*, AST*);
+bool ast_match_string(AST*, char*);
 bool ast_match_type(AST*, AST*);
 
-char *ast_to_string(AST*);
+char *_ast_to_string(AST*, uint8_t);
 char *ast_to_debug_string(AST*);
+
+#define ast_to_string(ast) _ast_to_string(ast, 0)
 
 //
 // gui

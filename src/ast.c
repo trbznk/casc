@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdbool.h>
+#include <string.h>
 
 #include "casc.h"
 
@@ -41,6 +42,24 @@ const char* ast_type_to_debug_string(ASTType type) {
     }
 }
 
+uint8_t op_type_precedence(OpType type) {
+    switch (type) {
+        case OP_POW:
+            return 4;
+        case OP_UADD:
+        case OP_USUB:
+            return 3;
+        case OP_MUL:
+        case OP_DIV:
+            return 2;
+        case OP_ADD:
+        case OP_SUB:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
 void ast_array_append(ASTArray *array, AST *node) {
     if (array->size == 0) {
         array->data = malloc(sizeof(AST));
@@ -61,7 +80,9 @@ AST* create_ast_integer(Arena* arena, int64_t value) {
 AST* create_ast_symbol(Arena* arena, char *name) {
     AST *node = arena_alloc(arena, sizeof(AST));
     node->type = AST_SYMBOL;
-    node->symbol.name = name;
+    node->symbol.name = arena_alloc(arena, strlen(name)+1);
+    strcpy(node->symbol.name, name);
+    assert(strlen(node->symbol.name) == strlen(name));
     return node;
 }
 
