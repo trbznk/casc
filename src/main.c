@@ -26,6 +26,8 @@ void arena_free(Arena *arena) {
 }
 
 void *arena_alloc(Arena *arena, size_t size) {
+    // TODO: add realloc here to make initial size needed smaller
+
     // current position in the memory
     void *memory = arena->memory + arena->offset;
 
