@@ -1,15 +1,21 @@
-// NEXT https://vulkan-tutorial.com/en/Drawing_a_triangle/Presentation/Swap_chain
+// NEXT https://vulkan-tutorial.com/en/Drawing_a_triangle/Presentation/Image_views
 
 #include <assert.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 const uint32_t WINDOW_WIDTH = 800;
 const uint32_t WINDOW_HEIGHT = 600;
+
+const char *device_extensions[] = {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+};
+const size_t device_extensions_count = sizeof(device_extensions)/sizeof(device_extensions[0]);
 
 typedef struct {
     VkInstance instance;
@@ -22,15 +28,38 @@ typedef struct {
     VkQueue present_queue;
 
     VkSurfaceKHR surface;
+
+    VkSwapchainKHR swap_chain;
+    VkImage *swap_chain_images;
+    VkFormat swap_chain_image_format;
+    VkExtent2D swap_chain_extent;
 } VkContext;
 
 typedef struct {
+
     uint32_t graphics_family;
     uint32_t present_family;
 
     bool graphics_family_has_value;
     bool present_family_has_value;
+
 } QueueFamilyIndices;
+
+typedef struct {
+
+    VkSurfaceCapabilitiesKHR capabilities;
+
+    VkSurfaceFormatKHR *formats;
+    uint32_t formats_count;
+    
+    VkPresentModeKHR *present_modes;
+    uint32_t present_modes_count;
+
+} SwapChainSupportDetails;
+
+bool vk_queue_family_indices_is_complete(QueueFamilyIndices *indices) {
+    return indices->graphics_family_has_value && indices->present_family_has_value;
+}
 
 void vk_init_window(VkContext *context) {
     glfwInit();
@@ -115,17 +144,124 @@ QueueFamilyIndices vk_find_queue_families(VkContext *context, VkPhysicalDevice d
     return indices;
 }
 
-bool vk_is_device_suitable(VkContext *context, VkPhysicalDevice device) {
-    VkPhysicalDeviceProperties device_properties;
-    vkGetPhysicalDeviceProperties(device, &device_properties);
+bool vk_check_device_extension_support(VkPhysicalDevice device) {
+    uint32_t extension_count;
+    vkEnumerateDeviceExtensionProperties(device, NULL, &extension_count, NULL);
 
-    VkPhysicalDeviceFeatures device_features;
-    vkGetPhysicalDeviceFeatures(device, &device_features);
+    VkExtensionProperties available_extensions[extension_count];
+    vkEnumerateDeviceExtensionProperties(device, NULL, &extension_count, available_extensions);
+
+    uint32_t seen = 0;
+    for (size_t i = 0; i < device_extensions_count; i++) {
+        for (size_t j = 0; j < extension_count; j++) {
+            if (!strcmp(device_extensions[i], available_extensions[j].extensionName)) {
+                seen += 1;
+            }
+        } 
+    }
+
+    return seen == device_extensions_count;
+}
+
+VkSurfaceFormatKHR vk_choose_swap_surface_format(const VkSurfaceFormatKHR *available_formats, size_t count) {
+    
+    for (size_t i = 0; i < count; i++) {
+        if (
+            available_formats[i].format == VK_FORMAT_B8G8R8A8_SRGB &&
+            available_formats[i].colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR
+        ) {
+            return available_formats[i];
+        }
+    }
+
+    return available_formats[0];
+}
+
+VkPresentModeKHR vk_choose_swap_present_mode(const VkPresentModeKHR *available_present_modes, size_t count) {
+
+    for (size_t i = 0; i < count; i++) {
+        if (available_present_modes[i] == VK_PRESENT_MODE_MAILBOX_KHR) {
+            return available_present_modes[i];
+        }
+    }
+
+    return VK_PRESENT_MODE_FIFO_KHR;
+}
+
+// TODO: move this into casc core.c
+uint32_t clamp(uint32_t v, uint32_t low, uint32_t high) {
+    if (low <= v && v <= high) {
+        return v;
+    } else if (v < low) {
+        return low;
+    } else if (high < v) {
+        return high;
+    }
+
+    // unreachable
+    assert(false);
+    return 0;
+}
+
+VkExtent2D vk_choose_swap_extent(VkContext *context, const VkSurfaceCapabilitiesKHR *capabilities) {
+    if (capabilities->currentExtent.width != UINT32_MAX) {
+        return capabilities->currentExtent;
+    } else {
+        int width, height;
+        glfwGetFramebufferSize(context->window, &width, &height);
+
+        VkExtent2D actual_extent = {
+            (uint32_t)width,
+            (uint32_t)height
+        };
+
+        actual_extent.width = clamp(actual_extent.width, capabilities->minImageExtent.width, capabilities->maxImageExtent.width);
+        actual_extent.height = clamp(actual_extent.height, capabilities->minImageExtent.height, capabilities->maxImageExtent.height);
+
+        return actual_extent;
+    }
+}
+
+SwapChainSupportDetails vk_query_swap_chain_support(VkContext *context, VkPhysicalDevice device) {
+    SwapChainSupportDetails details = {0};
+
+    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, context->surface, &details.capabilities);
+
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, context->surface, &details.formats_count, NULL);
+    if (details.formats_count != 0) {
+        details.formats = malloc(sizeof(VkSurfaceFormatKHR)*details.formats_count);
+        vkGetPhysicalDeviceSurfaceFormatsKHR(device, context->surface, &details.formats_count, details.formats);
+    }
+
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, context->surface, &details.present_modes_count, NULL);
+    if (details.present_modes_count != 0) {
+        details.present_modes = malloc(sizeof(VkPresentModeKHR)*details.present_modes_count);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(device, context->surface, &details.present_modes_count, details.present_modes);
+    }
+
+    return details;
+}
+
+bool vk_is_device_suitable(VkContext *context, VkPhysicalDevice device) {
+    // VkPhysicalDeviceProperties device_properties;
+    // vkGetPhysicalDeviceProperties(device, &device_properties);
+
+    // VkPhysicalDeviceFeatures device_features;
+    // vkGetPhysicalDeviceFeatures(device, &device_features);
 
     // @skip further device checking and scoring - https://vulkan-tutorial.com/en/Drawing_a_triangle/Setup/Physical_devices_and_queue_families
 
     QueueFamilyIndices indices = vk_find_queue_families(context, device);
-    return indices.graphics_family_has_value && indices.present_family_has_value;
+
+    bool extensions_supported = vk_check_device_extension_support(device);
+
+    bool swap_chain_adequate = false;
+    if (extensions_supported) {
+        SwapChainSupportDetails swap_chain_support = vk_query_swap_chain_support(context, device);
+        swap_chain_adequate = swap_chain_support.formats_count > 0 && swap_chain_support.present_modes_count > 0;
+    }
+
+    return vk_queue_family_indices_is_complete(&indices) && extensions_supported && swap_chain_adequate;
 }
 
 void vk_pick_physical_device(VkContext *context) {
@@ -182,6 +318,8 @@ void vk_create_logical_device(VkContext *context) {
     create_info.pQueueCreateInfos = queue_create_infos;
     create_info.queueCreateInfoCount = sizeof(queue_create_infos)/sizeof(queue_create_infos[0]);
     create_info.pEnabledFeatures = &device_features;
+    create_info.enabledExtensionCount = device_extensions_count;
+    create_info.ppEnabledExtensionNames = device_extensions;
 
     // belongs here and cannot be used until validation layers are not implemented - https://vulkan-tutorial.com/Drawing_a_triangle/Setup/Logical_device_and_queues
     // create_info.enabled_extension_count = 0;
@@ -210,6 +348,61 @@ void vk_create_surface(VkContext *context) {
     }
 }
 
+void vk_create_swap_chain(VkContext *context) {
+    SwapChainSupportDetails swap_chain_support = vk_query_swap_chain_support(context, context->physical_device);
+
+    VkSurfaceFormatKHR surface_format = vk_choose_swap_surface_format(swap_chain_support.formats, swap_chain_support.formats_count);
+    VkPresentModeKHR present_mode = vk_choose_swap_present_mode(swap_chain_support.present_modes, swap_chain_support.present_modes_count);
+    VkExtent2D extent = vk_choose_swap_extent(context, &swap_chain_support.capabilities);
+
+    uint32_t image_count = swap_chain_support.capabilities.minImageCount + 1;
+    if (swap_chain_support.capabilities.maxImageCount > 0 && image_count > swap_chain_support.capabilities.maxImageCount) {
+        image_count = swap_chain_support.capabilities.maxImageCount;
+    }
+
+    VkSwapchainCreateInfoKHR create_info = {0};
+    create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    create_info.surface = context->surface;
+    create_info.minImageCount = image_count;
+    create_info.imageFormat = surface_format.format;
+    create_info.imageColorSpace = surface_format.colorSpace;
+    create_info.imageExtent = extent;
+    create_info.imageArrayLayers = 1;
+    create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+    QueueFamilyIndices indices = vk_find_queue_families(context, context->physical_device);
+    uint32_t queue_family_indices[] = {indices.graphics_family, indices.present_family};
+
+    if (indices.graphics_family != indices.present_family) {
+        create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        create_info.queueFamilyIndexCount = 2;
+        create_info.pQueueFamilyIndices = queue_family_indices;
+    } else {
+        create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        create_info.queueFamilyIndexCount = 0; // Optional
+        create_info.pQueueFamilyIndices = NULL; // Optional
+    }
+
+    create_info.preTransform = swap_chain_support.capabilities.currentTransform;
+    create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    create_info.presentMode = present_mode;
+    create_info.clipped = VK_TRUE;
+    create_info.oldSwapchain = VK_NULL_HANDLE;
+
+    VkResult result = vkCreateSwapchainKHR(context->device, &create_info, NULL, &context->swap_chain);
+    if (result != VK_SUCCESS) {
+        // failed to create swap chain!
+        assert(false);
+    }
+
+    vkGetSwapchainImagesKHR(context->device, context->swap_chain, &image_count, NULL);
+    context->swap_chain_images = malloc(sizeof(VkImage)*image_count);
+    vkGetSwapchainImagesKHR(context->device, context->swap_chain, &image_count, context->swap_chain_images);
+
+    context->swap_chain_image_format = surface_format.format;
+    context->swap_chain_extent = extent;
+}
+
 void vk_init_vulkan(VkContext *context) {
     vk_create_instance(context);
     // @skip chapter 'Validation Layers' - https://vulkan-tutorial.com/Drawing_a_triangle/Setup/Validation_layers
@@ -217,6 +410,7 @@ void vk_init_vulkan(VkContext *context) {
     vk_create_surface(context);
     vk_pick_physical_device(context);
     vk_create_logical_device(context);
+    vk_create_swap_chain(context);
 }
 
 void vk_main_loop(VkContext *context) {
@@ -226,9 +420,9 @@ void vk_main_loop(VkContext *context) {
 }
 
 void vk_cleanup(VkContext *context) {
-    vkDestroySurfaceKHR(context->instance, context->surface, NULL);
-
+    vkDestroySwapchainKHR(context->device, context->swap_chain, NULL);
     vkDestroyDevice(context->device, NULL);
+    vkDestroySurfaceKHR(context->instance, context->surface, NULL);
     vkDestroyInstance(context->instance, NULL);
 
     glfwDestroyWindow(context->window);
