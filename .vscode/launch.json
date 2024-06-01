@@ -24,6 +24,18 @@
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb"
+        },
+        {
+            "name": "debug vk",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/run_vk.sh",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "${fileDirname}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb"
         }
     ]
 }

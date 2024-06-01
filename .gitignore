@@ -3,3 +3,5 @@ thirdparty/raylib/libraylib.a
 casc.dSYM
 vk.dSYM
 vk
+shaders/frag.spv
+shaders/vert.spv
