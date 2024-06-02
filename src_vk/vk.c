@@ -1,4 +1,4 @@
-// NEXT: https://vulkan-tutorial.com/en/Vertex_buffers/Vertex_input_description
+// NEXT: https://vulkan-tutorial.com/Vertex_buffers/Staging_buffer
 
 #include <assert.h>
 #include <stdbool.h>
@@ -76,6 +76,9 @@ typedef struct {
     uint32_t current_frame;
 
     bool framebuffer_resized;
+
+    VkBuffer vertex_buffer;
+    VkDeviceMemory vertex_buffer_memory;
 } VkContext;
 
 VkContext *CONTEXT;
@@ -106,6 +109,56 @@ typedef struct {
     size_t size;
     uint8_t *bytes;
 } ShaderCode;
+
+typedef struct {
+    float x, y;
+} v2f;
+
+typedef struct {
+    float x, y, z;
+} v3f;
+
+typedef struct {
+    v2f pos;
+    v3f color;
+} Vertex;
+
+typedef struct {
+    VkVertexInputAttributeDescription pos_description;
+    VkVertexInputAttributeDescription color_description;
+} VertexInputAttributeDescription;
+
+const Vertex vertices[] = {
+    {{0.0f, -0.5f}, {0.5f, 0.5f, 0.0f}},
+    {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+    {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+};
+size_t vertices_count = sizeof(vertices)/sizeof(vertices[0]);
+
+VkVertexInputBindingDescription vk_vertex_get_binding_description() {
+    VkVertexInputBindingDescription binding_description = {0};
+    binding_description.binding = 0;
+    binding_description.stride = sizeof(Vertex);
+    binding_description.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+    return binding_description;
+}
+
+VertexInputAttributeDescription vk_vertext_get_attribute_descriptions() {
+    VertexInputAttributeDescription description = {0};
+
+    description.pos_description.binding = 0;
+    description.pos_description.location = 0;
+    description.pos_description.format = VK_FORMAT_R32G32_SFLOAT;
+    description.pos_description.offset = offsetof(Vertex, pos);
+
+    description.color_description.binding = 0;
+    description.color_description.location = 1;
+    description.color_description.format = VK_FORMAT_R32G32B32_SFLOAT;
+    description.color_description.offset = offsetof(Vertex, color);
+
+    return description;
+}
 
 bool vk_check_validation_layer_support() {
     uint32_t layer_count;
@@ -151,6 +204,58 @@ void vk_init_window(VkContext *context) {
     context->window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Vulkan", NULL, NULL);
     // glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(context->window, vk_framebuffer_resize_callback);
+}
+
+uint32_t vk_find_memory_type(VkContext *context, uint32_t type_filter, VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties mem_properties;
+    vkGetPhysicalDeviceMemoryProperties(context->physical_device, &mem_properties);
+
+    for (uint32_t i = 0; i < mem_properties.memoryTypeCount; i++) {
+        if ((type_filter & (1 << i)) && (mem_properties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    // failed to find suitable memory type!
+    assert(false);
+}
+
+void vk_create_vertex_buffer(VkContext *context) {
+    VkBufferCreateInfo buffer_info = {0};
+    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_info.size = sizeof(vertices[0]) * vertices_count;
+    buffer_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VkResult result = vkCreateBuffer(context->device, &buffer_info, NULL, &context->vertex_buffer);
+    if (result != VK_SUCCESS) {
+        // failed to create vertex buffer!
+        assert(false);
+    }
+
+    VkMemoryRequirements mem_requirements;
+    vkGetBufferMemoryRequirements(context->device, context->vertex_buffer, &mem_requirements);
+
+    VkMemoryAllocateInfo alloc_info = {0};
+    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc_info.allocationSize = mem_requirements.size;
+    alloc_info.memoryTypeIndex = vk_find_memory_type(
+        context,
+        mem_requirements.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+    );
+
+    result = vkAllocateMemory(context->device, &alloc_info, NULL, &context->vertex_buffer_memory);
+    if (result != VK_SUCCESS) {
+        // failed to allocate vertex buffer memory!
+        assert(false);
+    }
+    vkBindBufferMemory(context->device, context->vertex_buffer, context->vertex_buffer_memory, 0);
+
+    void *data;
+    vkMapMemory(context->device, context->vertex_buffer_memory, 0, buffer_info.size, 0, &data);
+    memcpy(data, vertices, (size_t) buffer_info.size);
+    vkUnmapMemory(context->device, context->vertex_buffer_memory);
 }
 
 void vk_create_instance(VkContext *context) {
@@ -630,13 +735,18 @@ void vk_create_graphics_pipeline(VkContext *context) {
 
     VkPipelineShaderStageCreateInfo shader_stages[] = {vert_shader_stage_info, frag_shader_stage_info};
 
+    VkVertexInputBindingDescription binding_description = vk_vertex_get_binding_description();
+    VkVertexInputAttributeDescription attribute_descriptions[] = {
+        vk_vertext_get_attribute_descriptions().pos_description,
+        vk_vertext_get_attribute_descriptions().color_description
+    };
     VkPipelineVertexInputStateCreateInfo vertex_input_info = {0};
     vertex_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertex_input_info.vertexBindingDescriptionCount = 0;
-    vertex_input_info.pVertexBindingDescriptions = NULL; // Optional
-    vertex_input_info.vertexAttributeDescriptionCount = 0;
-    vertex_input_info.pVertexAttributeDescriptions = NULL; // Optional
-
+    vertex_input_info.vertexBindingDescriptionCount = 1;
+    vertex_input_info.pVertexBindingDescriptions = &binding_description;
+    vertex_input_info.vertexAttributeDescriptionCount = 2;
+    vertex_input_info.pVertexAttributeDescriptions = attribute_descriptions;
+    
     VkPipelineInputAssemblyStateCreateInfo input_assembly = {0};
     input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
     input_assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
@@ -867,7 +977,11 @@ void vk_record_command_buffer(VkContext *context, VkCommandBuffer command_buffer
     scissor.extent = context->swap_chain_extent;
     vkCmdSetScissor(command_buffer, 0, 1, &scissor);
 
-    vkCmdDraw(command_buffer, 3, 1, 0, 0);
+    VkBuffer vertex_buffers[] = {context->vertex_buffer};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
+
+    vkCmdDraw(command_buffer, (uint32_t)vertices_count, 1, 0, 0);
     vkCmdEndRenderPass(command_buffer);
 
     {
@@ -1021,6 +1135,7 @@ void vk_init_vulkan(VkContext *context) {
     vk_create_graphics_pipeline(context);
     vk_create_framebuffers(context);
     vk_create_command_pool(context);
+    vk_create_vertex_buffer(context);
     vk_create_command_buffers(context);
     vk_create_sync_objects(context);
 }
@@ -1034,6 +1149,15 @@ void vk_main_loop(VkContext *context) {
 }
 
 void vk_cleanup(VkContext *context) {
+    vk_cleanup_swap_chain(context);
+
+    vkDestroyBuffer(context->device, context->vertex_buffer, NULL);
+    vkFreeMemory(context->device, context->vertex_buffer_memory, NULL);
+
+    vkDestroyPipeline(context->device, context->graphics_pipeline, NULL);
+    vkDestroyPipelineLayout(context->device, context->pipeline_layout, NULL);
+    vkDestroyRenderPass(context->device, context->render_pass, NULL);
+
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vkDestroySemaphore(context->device, context->image_available_semaphores[i], NULL);
         vkDestroySemaphore(context->device, context->render_finished_semaphores[i], NULL);
@@ -1041,14 +1165,14 @@ void vk_cleanup(VkContext *context) {
     }
 
     vkDestroyCommandPool(context->device, context->command_pool, NULL);
-    vkDestroyPipeline(context->device, context->graphics_pipeline, NULL);
-    vkDestroyPipelineLayout(context->device, context->pipeline_layout, NULL);
-    vkDestroyRenderPass(context->device, context->render_pass, NULL);
+
     vkDestroyDevice(context->device, NULL);
+
     vkDestroySurfaceKHR(context->instance, context->surface, NULL);
     vkDestroyInstance(context->instance, NULL);
 
     glfwDestroyWindow(context->window);
+
     glfwTerminate();
 }
 
