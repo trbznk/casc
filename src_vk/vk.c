@@ -1,4 +1,4 @@
-// NEXT: https://vulkan-tutorial.com/Drawing_a_triangle/Drawing/Frames_in_flight
+// NEXT: https://vulkan-tutorial.com/en/Vertex_buffers/Vertex_input_description
 
 #include <assert.h>
 #include <stdbool.h>
@@ -61,12 +61,24 @@ typedef struct {
     uint32_t swap_chain_framebuffers_count;
 
     VkCommandPool command_pool;
-    VkCommandBuffer command_buffer;
+    VkCommandBuffer *command_buffers;
+    size_t command_buffers_count;
 
-    VkSemaphore image_available_semaphore;
-    VkSemaphore render_finished_semaphore;
-    VkFence in_flight_fence;
+    VkSemaphore *image_available_semaphores;
+    size_t image_available_semaphores_count;
+
+    VkSemaphore *render_finished_semaphores;
+    size_t render_finished_semaphores_count;
+
+    VkFence *in_flight_fences;
+    size_t in_flight_fences_count;
+
+    uint32_t current_frame;
+
+    bool framebuffer_resized;
 } VkContext;
+
+VkContext *CONTEXT;
 
 typedef struct {
 
@@ -124,13 +136,21 @@ bool vk_queue_family_indices_is_complete(QueueFamilyIndices *indices) {
     return indices->graphics_family_has_value && indices->present_family_has_value;
 }
 
+static void vk_framebuffer_resize_callback(GLFWwindow* window, int width, int height) {
+    (void)window;
+    (void)width;
+    (void)height;
+    CONTEXT->framebuffer_resized = true;
+}
+
 void vk_init_window(VkContext *context) {
     glfwInit();
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
     context->window = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Vulkan", NULL, NULL);
+    // glfwSetWindowUserPointer(window, this);
+    glfwSetFramebufferSizeCallback(context->window, vk_framebuffer_resize_callback);
 }
 
 void vk_create_instance(VkContext *context) {
@@ -787,14 +807,17 @@ void vk_create_command_pool(VkContext *context) {
     }
 }
 
-void vk_create_command_buffer(VkContext *context) {
+void vk_create_command_buffers(VkContext *context) {
+    context->command_buffers_count = MAX_FRAMES_IN_FLIGHT;
+    context->command_buffers = malloc(sizeof(VkCommandBuffer)*context->command_buffers_count);
+
     VkCommandBufferAllocateInfo alloc_info = {0};
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool = context->command_pool;
     alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    alloc_info.commandBufferCount = 1;
+    alloc_info.commandBufferCount = context->command_buffers_count;
 
-    VkResult result = vkAllocateCommandBuffers(context->device, &alloc_info, &context->command_buffer);
+    VkResult result = vkAllocateCommandBuffers(context->device, &alloc_info, context->command_buffers);
     if (result != VK_SUCCESS) {
         // failed to allocate command buffers!
         assert(false);
@@ -856,34 +879,79 @@ void vk_record_command_buffer(VkContext *context, VkCommandBuffer command_buffer
     }
 }
 
+void vk_cleanup_swap_chain(VkContext *context) {
+    for (size_t i = 0; i < context->swap_chain_framebuffers_count; i++) {
+        vkDestroyFramebuffer(context->device, context->swap_chain_framebuffers[i], NULL);
+    }
+
+    for (size_t i = 0; i < context->swap_chain_image_views_count; i++) {
+        vkDestroyImageView(context->device, context->swap_chain_image_views[i], NULL);
+    }
+
+    vkDestroySwapchainKHR(context->device, context->swap_chain, NULL);
+}
+
+void vk_recreate_swap_chain(VkContext *context) {
+    int width = 0;
+    int height = 0;
+    glfwGetFramebufferSize(context->window, &width, &height);
+    while (width == 0 || height == 0) {
+        glfwGetFramebufferSize(context->window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    vkDeviceWaitIdle(context->device);
+
+    vk_cleanup_swap_chain(context);
+
+    vk_create_swap_chain(context);
+    vk_create_image_views(context);
+    vk_create_framebuffers(context);
+}
+
 void vk_draw_frame(VkContext *context) {
-    vkWaitForFences(context->device, 1, &context->in_flight_fence, VK_TRUE, UINT64_MAX);
-    vkResetFences(context->device, 1, &context->in_flight_fence);
+    vkWaitForFences(context->device, 1, &context->in_flight_fences[context->current_frame], VK_TRUE, UINT64_MAX);
 
     uint32_t image_index;
-    vkAcquireNextImageKHR(context->device, context->swap_chain, UINT64_MAX, context->image_available_semaphore, VK_NULL_HANDLE, &image_index);
+    VkResult result = vkAcquireNextImageKHR(
+        context->device,
+        context->swap_chain,
+        UINT64_MAX,
+        context->image_available_semaphores[context->current_frame],
+        VK_NULL_HANDLE,
+        &image_index
+    );
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        vk_recreate_swap_chain(context);
+        return;
+    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+        // failed to acquire swap chain image!
+        assert(false);
+    }
 
-    vkResetCommandBuffer(context->command_buffer, 0);
-    vk_record_command_buffer(context, context->command_buffer, image_index);
+    vkResetFences(context->device, 1, &context->in_flight_fences[context->current_frame]);
+
+    vkResetCommandBuffer(context->command_buffers[context->current_frame], 0);
+    vk_record_command_buffer(context, context->command_buffers[context->current_frame], image_index);
 
     VkSubmitInfo submit_info = {0};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
-    VkSemaphore wait_semaphores[] = {context->image_available_semaphore};
+    VkSemaphore wait_semaphores[] = {context->image_available_semaphores[context->current_frame]};
     VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     submit_info.waitSemaphoreCount = 1;
     submit_info.pWaitSemaphores = wait_semaphores;
     submit_info.pWaitDstStageMask = wait_stages;
 
     submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &context->command_buffer;
+    submit_info.pCommandBuffers = &context->command_buffers[context->current_frame];
 
-    VkSemaphore signal_semaphores[] = {context->render_finished_semaphore};
+    VkSemaphore signal_semaphores[] = {context->render_finished_semaphores[context->current_frame]};
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = signal_semaphores;
 
-    // @mark segfault
-    VkResult result = vkQueueSubmit(context->graphics_queue, 1, &submit_info, context->in_flight_fence);
+
+    result = vkQueueSubmit(context->graphics_queue, 1, &submit_info, context->in_flight_fences[context->current_frame]);
     if (result != VK_SUCCESS) {
         // failed to submit draw command buffer!
         assert(false);
@@ -901,10 +969,27 @@ void vk_draw_frame(VkContext *context) {
     present_info.pImageIndices = &image_index;
     present_info.pResults = NULL; // Optional
 
-    vkQueuePresentKHR(context->present_queue, &present_info);
+    result = vkQueuePresentKHR(context->present_queue, &present_info);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || context->framebuffer_resized) {
+        context->framebuffer_resized = false;
+        vk_recreate_swap_chain(context);
+    } else if (result != VK_SUCCESS) {
+        // failed to present swap chain image!
+        assert(false);
+    }
+
+    context->current_frame = (context->current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
 void vk_create_sync_objects(VkContext *context) {
+    context->image_available_semaphores_count = MAX_FRAMES_IN_FLIGHT;
+    context->render_finished_semaphores_count = MAX_FRAMES_IN_FLIGHT;
+    context->in_flight_fences_count = MAX_FRAMES_IN_FLIGHT;
+    context->image_available_semaphores = malloc(sizeof(VkSemaphore)*context->image_available_semaphores_count);
+    context->render_finished_semaphores = malloc(sizeof(VkSemaphore)*context->render_finished_semaphores_count);
+    context->in_flight_fences = malloc(sizeof(VkFence)*context->in_flight_fences_count);
+
     VkSemaphoreCreateInfo semaphore_info = {0};
     semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
@@ -912,12 +997,14 @@ void vk_create_sync_objects(VkContext *context) {
     fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    VkResult r1 = vkCreateSemaphore(context->device, &semaphore_info, NULL, &context->image_available_semaphore);
-    VkResult r2 = vkCreateSemaphore(context->device, &semaphore_info, NULL, &context->render_finished_semaphore);
-    VkResult r3 = vkCreateFence(context->device, &fence_info, NULL, &context->in_flight_fence);
-    if (r1 != VK_SUCCESS || r2 != VK_SUCCESS || r3 != VK_SUCCESS) {
-        // failed to create semaphores!
-        assert(false);
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        VkResult r1 = vkCreateSemaphore(context->device, &semaphore_info, NULL, &context->image_available_semaphores[i]);
+        VkResult r2 = vkCreateSemaphore(context->device, &semaphore_info, NULL, &context->render_finished_semaphores[i]);
+        VkResult r3 = vkCreateFence(context->device, &fence_info, NULL, &context->in_flight_fences[i]);
+        if (r1 != VK_SUCCESS || r2 != VK_SUCCESS || r3 != VK_SUCCESS) {
+            // failed to create semaphores!
+            assert(false);
+        }
     }
 }
 
@@ -934,7 +1021,7 @@ void vk_init_vulkan(VkContext *context) {
     vk_create_graphics_pipeline(context);
     vk_create_framebuffers(context);
     vk_create_command_pool(context);
-    vk_create_command_buffer(context);
+    vk_create_command_buffers(context);
     vk_create_sync_objects(context);
 }
 
@@ -947,20 +1034,16 @@ void vk_main_loop(VkContext *context) {
 }
 
 void vk_cleanup(VkContext *context) {
-    vkDestroySemaphore(context->device, context->image_available_semaphore, NULL);
-    vkDestroySemaphore(context->device, context->render_finished_semaphore, NULL);
-    vkDestroyFence(context->device, context->in_flight_fence, NULL);
-    vkDestroyCommandPool(context->device, context->command_pool, NULL);
-    for (size_t i = 0; i < context->swap_chain_framebuffers_count; i++) {
-        vkDestroyFramebuffer(context->device, context->swap_chain_framebuffers[i], NULL);
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        vkDestroySemaphore(context->device, context->image_available_semaphores[i], NULL);
+        vkDestroySemaphore(context->device, context->render_finished_semaphores[i], NULL);
+        vkDestroyFence(context->device, context->in_flight_fences[i], NULL);
     }
+
+    vkDestroyCommandPool(context->device, context->command_pool, NULL);
     vkDestroyPipeline(context->device, context->graphics_pipeline, NULL);
     vkDestroyPipelineLayout(context->device, context->pipeline_layout, NULL);
     vkDestroyRenderPass(context->device, context->render_pass, NULL);
-    for (size_t i = 0; i < context->swap_chain_images_count; i++) {
-        vkDestroyImageView(context->device, context->swap_chain_image_views[i], NULL);
-    }
-    vkDestroySwapchainKHR(context->device, context->swap_chain, NULL);
     vkDestroyDevice(context->device, NULL);
     vkDestroySurfaceKHR(context->instance, context->surface, NULL);
     vkDestroyInstance(context->instance, NULL);
@@ -978,6 +1061,7 @@ void vk_run(VkContext *context) {
 
 int main() {
     VkContext context = {0};
+    CONTEXT = &context;
 
     vk_run(&context);
 
