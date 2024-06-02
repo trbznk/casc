@@ -1,4 +1,4 @@
-// NEXT https://vulkan-tutorial.com/en/Drawing_a_triangle/Presentation/Image_views
+// NEXT: https://vulkan-tutorial.com/Drawing_a_triangle/Drawing/Frames_in_flight
 
 #include <assert.h>
 #include <stdbool.h>
@@ -11,6 +11,19 @@
 
 const uint32_t WINDOW_WIDTH = 800;
 const uint32_t WINDOW_HEIGHT = 600;
+
+const int MAX_FRAMES_IN_FLIGHT = 2;
+
+const char* validation_layers[] = {
+    "VK_LAYER_KHRONOS_validation"
+};
+const size_t validation_layers_count = sizeof(validation_layers)/sizeof(validation_layers[0]);
+
+#ifdef NDEBUG
+    const bool enable_validation_layers = false;
+#else
+    const bool enable_validation_layers = true;
+#endif
 
 const char *device_extensions[] = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -82,6 +95,31 @@ typedef struct {
     uint8_t *bytes;
 } ShaderCode;
 
+bool vk_check_validation_layer_support() {
+    uint32_t layer_count;
+    vkEnumerateInstanceLayerProperties(&layer_count, NULL);
+
+    VkLayerProperties available_layers[layer_count];
+    vkEnumerateInstanceLayerProperties(&layer_count, available_layers);
+
+    for (size_t i = 0; i < validation_layers_count; i++) {
+        bool layer_found = false;
+
+        for (size_t j = 0; j < layer_count; j++) {
+            if (strcmp(validation_layers[i], available_layers[j].layerName) == 0) {
+                layer_found = true;
+                break;
+            }
+        }
+
+        if (!layer_found) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 bool vk_queue_family_indices_is_complete(QueueFamilyIndices *indices) {
     return indices->graphics_family_has_value && indices->present_family_has_value;
 }
@@ -96,6 +134,11 @@ void vk_init_window(VkContext *context) {
 }
 
 void vk_create_instance(VkContext *context) {
+    if (enable_validation_layers && !vk_check_validation_layer_support()) {
+        // validation layers requested, but not available!
+        assert(false);
+    }
+
     // app info
     VkApplicationInfo app_info = {0};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -130,7 +173,12 @@ void vk_create_instance(VkContext *context) {
     create_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
     create_info.enabledExtensionCount = glfw_extension_count+1;
     create_info.ppEnabledExtensionNames = required_extensions;
-    create_info.enabledLayerCount = 0;
+    if (enable_validation_layers) {
+        create_info.enabledLayerCount = validation_layers_count;
+        create_info.ppEnabledLayerNames = validation_layers;
+    } else {
+        create_info.enabledLayerCount = 0;
+    }
 
     // create instance
     VkResult result = vkCreateInstance(&create_info, NULL, &context->instance);
@@ -458,6 +506,7 @@ void vk_create_image_views(VkContext* context) {
 
 // TODO: move this function into core.c
 ShaderCode vk_read_shader_code_file(const char* path) {
+    printf("read shader code %s\n", path);
     ShaderCode code;
 
     FILE *f = fopen(path, "rb");
@@ -468,6 +517,7 @@ ShaderCode vk_read_shader_code_file(const char* path) {
 
     fseek(f, 0, SEEK_END);
     code.size = ftell(f);
+    printf("code.size=%zu\n", code.size);
     rewind(f);
 
     code.bytes = malloc(code.size*sizeof(uint8_t));
@@ -483,7 +533,7 @@ VkShaderModule vk_create_shader_module(VkContext *context, ShaderCode code) {
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     create_info.codeSize = code.size;
     // create_info.pCode = reinterpret_cast<const uint32_t*>(code.data());
-    create_info.pCode = (uint32_t*)code.bytes;
+    create_info.pCode = (const uint32_t*)code.bytes;
 
     VkShaderModule shader_module;
     VkResult result = vkCreateShaderModule(context->device, &create_info, NULL, &shader_module);
@@ -540,8 +590,8 @@ void vk_create_render_pass(VkContext *context) {
 }
 
 void vk_create_graphics_pipeline(VkContext *context) {
-    ShaderCode vert_shader_code = vk_read_shader_code_file("shaders/vert.spv");
-    ShaderCode frag_shader_code = vk_read_shader_code_file("shaders/frag.spv");
+    ShaderCode vert_shader_code = vk_read_shader_code_file("/Users/alex/repos/casc/shaders/vert.spv");
+    ShaderCode frag_shader_code = vk_read_shader_code_file("/Users/alex/repos/casc/shaders/frag.spv");
 
     VkShaderModule vert_shader_module = vk_create_shader_module(context, vert_shader_code);
     VkShaderModule frag_shader_module = vk_create_shader_module(context, frag_shader_code);
@@ -775,7 +825,9 @@ void vk_record_command_buffer(VkContext *context, VkCommandBuffer command_buffer
     render_pass_info.renderArea.extent = context->swap_chain_extent;
     render_pass_info.clearValueCount = 1;
     render_pass_info.pClearValues = &clear_color;
+
     vkCmdBeginRenderPass(command_buffer, &render_pass_info, VK_SUBPASS_CONTENTS_INLINE);
+    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, context->graphics_pipeline);
 
     VkViewport viewport = {0};
     viewport.x = 0.0f;
@@ -830,6 +882,7 @@ void vk_draw_frame(VkContext *context) {
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = signal_semaphores;
 
+    // @mark segfault
     VkResult result = vkQueueSubmit(context->graphics_queue, 1, &submit_info, context->in_flight_fence);
     if (result != VK_SUCCESS) {
         // failed to submit draw command buffer!
@@ -890,6 +943,7 @@ void vk_main_loop(VkContext *context) {
         glfwPollEvents();
         vk_draw_frame(context);
     }
+    vkDeviceWaitIdle(context->device);
 }
 
 void vk_cleanup(VkContext *context) {
