@@ -9,6 +9,7 @@
         "limits": "c",
         "ratio": "c",
         "tuple": "c",
-        "__config": "c"
+        "__config": "c",
+        "math.h": "c"
     }
 }

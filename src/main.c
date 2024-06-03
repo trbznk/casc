@@ -8,7 +8,7 @@
 
 #include "casc.h"
 
-#define ARENA_SIZE 60*1024
+#define ARENA_SIZE 100*1024
 
 Arena create_arena(size_t size) {
     return (Arena){ .memory=malloc(size), .offset=0, .size=size };
@@ -222,8 +222,18 @@ int main(int argc, char *argv[]) {
         Worker _w = create_worker();
         Worker *w = &_w;
 
-        char *source = "(-x)^2";
+        // ASTArray a = ast_to_flat_array(&w->arena, MUL(INTEGER(2), SYMBOL("x")));
+        // for (size_t i = 0; i < a.size; i++) {
+        //     printf("[%zu] %s\n", i, ast_to_debug_string(a.data[i]));
+        // }
+        
+        char *source = "diff((x^3+y)^2, x)";
+
         AST *output = interp_from_string(w, source);
+        ASTArray a = ast_to_flat_array(&w->arena, output);
+        for (size_t i = 0; i < a.size; i++) {
+            printf("[%zu] %s\n", i, ast_to_debug_string(a.data[i]));
+        }
 
         printf("%s\n", ast_to_string(output));
         printf("%s\n", ast_to_debug_string(output));

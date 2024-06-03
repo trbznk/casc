@@ -145,6 +145,10 @@ AST* interp_binop_add(Worker *w, AST* node) {
 
     if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
         return create_ast_integer(&w->arena, left->integer.value + right->integer.value);
+    } else if (ast_match(left, INTEGER(0))) {
+        return right;
+    } else if (ast_match(right, INTEGER(0))) {
+        return left;
     } else if (ast_match(left, right)) {
         return create_ast_binop(&w->arena, create_ast_integer(&w->arena, 2), left, OP_MUL);
     } else if (ast_match_type(left, create_ast_binop(&w->arena, create_ast_integer(&w->arena, 1), create_ast_integer(&w->arena, 1), OP_DIV)) && ast_match_type(right, create_ast_binop(&w->arena, create_ast_integer(&w->arena, 1), create_ast_integer(&w->arena, 1), OP_DIV))) {
@@ -165,10 +169,6 @@ AST* interp_binop_add(Worker *w, AST* node) {
             AST* new_left = interp_binop(w, create_ast_binop(&w->arena, create_ast_integer(&w->arena, 1), left->binop.left, OP_ADD));
             return create_ast_binop(&w->arena, new_left, right, OP_MUL);
         }
-    } else if (ast_match(left, INTEGER(0))) {
-        return right;
-    } else if (ast_match(right, INTEGER(0))) {
-        return left;
     }
     return create_ast_binop(&w->arena, left, right, OP_ADD);
 }
@@ -296,6 +296,48 @@ AST* interp_unaryop(Worker *w, AST* node) {
     return create_ast_unaryop(&w->arena, expr, op_type);
 }
 
+AST* diff(Worker *w, AST *expr, AST *var) {
+    (void)w;
+    (void)var;
+
+    switch (expr->type) {
+        case AST_SYMBOL: {
+            if (ast_match(expr, var)) {
+                return INTEGER(1);
+            } else {
+                return INTEGER(0);
+            }
+        }
+        case AST_BINOP: {
+            switch (expr->binop.type) {
+                case OP_POW: {
+                    assert(ast_contains(expr->binop.left, var)); // check if base is function of 'var'
+                    assert(!ast_contains(expr->binop.right, var)); // exponent must be constant for now
+                    
+                    AST* b = expr->binop.left;
+                    AST* n = expr->binop.right;
+                    // x^n -> n * x^(n-1) * x'
+                    AST* result = MUL(MUL(n, POW(b, SUB(n, INTEGER(1)))), diff(w, b, var));
+                    return interp_binop_mul(w, result);
+                }
+                case OP_ADD: {
+                    // a + b -> a' + b'
+                    AST *dl = diff(w, expr->binop.left, var);
+                    AST *dr = diff(w, expr->binop.right, var);
+                    AST *result = ADD(dl, dr);
+                    return interp_binop_add(w, result);
+                }
+                default:
+                    printf("op '%s' not implemented\n", op_type_to_debug_string(expr->binop.type));
+                    assert(false);
+            }
+        }
+        default:
+            printf("type '%s' not implemented\n", ast_type_to_debug_string(expr->type));
+            assert(false);
+    }
+}
+
 AST* interp_func_call(Worker *w, AST* node) {
     // TODO: we need a proper system for checking and using args (function definitions and function signatures)
 
@@ -354,6 +396,33 @@ AST* interp_func_call(Worker *w, AST* node) {
         return create_ast_integer(&w->arena, 0);
     } else if (ast_match_string(node, "cos(pi)")) {
         return create_ast_integer(&w->arena, -1);
+    } else if (!strcmp(name.text, "diff")) {
+        AST* diff_var;
+
+        if (node->func_call.args.size == 1) {
+            ASTArray nodes = ast_to_flat_array(&w->arena, node);
+            bool symbol_seen = false;
+            AST *symbol;
+            for (size_t i = 0; i < nodes.size; i++) {
+                if (nodes.data[i]->type == AST_SYMBOL) {
+                    if (symbol_seen) {
+                        assert(ast_match(symbol, nodes.data[i]));
+                    } else {
+                        symbol_seen = true;
+                        symbol = nodes.data[i];
+                    }
+                }
+            }
+            assert(symbol_seen);
+            diff_var = symbol;
+        } else if (node->func_call.args.size == 2) {
+            assert(node->func_call.args.data[1]->type == AST_SYMBOL);
+            diff_var = node->func_call.args.data[1];
+        } else {
+            assert(false);
+        }
+
+        return diff(w, node->func_call.args.data[0], diff_var);
     }
 
     return node;

@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "casc.h"
 
@@ -61,6 +62,7 @@ uint8_t op_type_precedence(OpType type) {
 }
 
 void ast_array_append(ASTArray *array, AST *node) {
+    // TODO: we need to change this to arena allocator
     if (array->size == 0) {
         array->data = malloc(sizeof(AST));
     } else {
@@ -117,3 +119,53 @@ AST* create_ast_empty(Arena* arena) {
     node->empty = true;
     return node;
 }
+
+void _ast_to_flat_array(Arena* arena, AST* ast, ASTArray* array) {
+    (void)arena;
+    (void)ast;
+    (void)array;
+
+    switch (ast->type) {
+        case AST_INTEGER:
+        case AST_SYMBOL:
+            ast_array_append(array, ast);
+            break;
+        case AST_BINOP:
+            ast_array_append(array, ast);
+            _ast_to_flat_array(arena, ast->binop.left, array);
+            _ast_to_flat_array(arena, ast->binop.right, array);
+            break;
+        case AST_FUNC_CALL:
+            ast_array_append(array, ast);
+            for (size_t i = 0; i < ast->func_call.args.size; i++) {
+                _ast_to_flat_array(arena, ast->func_call.args.data[i], array);
+            }
+            break;
+        default: 
+            printf("type %s not implemented\n", ast_type_to_debug_string(ast->type));
+            assert(false);
+    }
+}
+
+ASTArray ast_to_flat_array(Arena* arena, AST* ast) {
+    ASTArray array = {0};
+
+    _ast_to_flat_array(arena, ast, &array);
+    return array;
+}
+
+bool ast_contains(AST *node, AST *target) {
+    if (ast_match(node, target)) {
+        return true;
+    } else {
+        switch (node->type) {
+            case AST_INTEGER:
+                return false;
+            case AST_BINOP:
+                return ast_contains(node->binop.left, target) || ast_contains(node->binop.right, target);
+            default:
+                printf("type '%s' not implemented\n", ast_type_to_debug_string(node->type));
+                assert(false);
+        }
+    }
+};

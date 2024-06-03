@@ -78,10 +78,12 @@ bool is_builtin_constant(char*);
 //
 
 #define INTEGER(value) create_ast_integer(&w->arena, value)
+#define SYMBOL(name) create_ast_symbol(&w->arena, name)
 #define ADD(left, right) create_ast_binop(&w->arena, left, right, OP_ADD)
 #define SUB(left, right) create_ast_binop(&w->arena, left, right, OP_SUB)
 #define MUL(left, right) create_ast_binop(&w->arena, left, right, OP_MUL)
 #define DIV(left, right) create_ast_binop(&w->arena, left, right, OP_DIV)
+#define POW(left, right) create_ast_binop(&w->arena, left, right, OP_POW)
 
 typedef struct ASTArray ASTArray;
 
@@ -162,7 +164,10 @@ void ast_array_append(ASTArray*, AST*);
 const char* op_type_to_debug_string(OpType);
 const char* op_type_to_string(OpType);
 const char* ast_type_to_debug_string(ASTType);
-uint8_t op_type_precedence(OpType); 
+uint8_t op_type_precedence(OpType);
+
+ASTArray ast_to_flat_array(Arena*, AST*);
+bool ast_contains(AST*, AST*);
 
 //
 // parser
