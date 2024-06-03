@@ -8,6 +8,7 @@
         "__memory": "c",
         "limits": "c",
         "ratio": "c",
-        "tuple": "c"
+        "tuple": "c",
+        "__config": "c"
     }
 }

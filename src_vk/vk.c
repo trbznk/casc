@@ -1,4 +1,4 @@
-// NEXT: https://vulkan-tutorial.com/Vertex_buffers/Staging_buffer
+// NEXT: https://vulkan-tutorial.com/Uniform_buffers/Descriptor_layout_and_buffer
 
 #include <assert.h>
 #include <stdbool.h>
@@ -79,6 +79,8 @@ typedef struct {
 
     VkBuffer vertex_buffer;
     VkDeviceMemory vertex_buffer_memory;
+    VkBuffer index_buffer;
+    VkDeviceMemory index_buffer_memory;
 } VkContext;
 
 VkContext *CONTEXT;
@@ -128,12 +130,22 @@ typedef struct {
     VkVertexInputAttributeDescription color_description;
 } VertexInputAttributeDescription;
 
+// const Vertex vertices[] = {
+//     {{0.0f, -0.5f}, {0.5f, 0.5f, 0.0f}},
+//     {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+//     {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+// };
 const Vertex vertices[] = {
-    {{0.0f, -0.5f}, {0.5f, 0.5f, 0.0f}},
-    {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-    {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+    {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+    {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+    {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+    {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
 };
 size_t vertices_count = sizeof(vertices)/sizeof(vertices[0]);
+const uint16_t indices[] = {
+    0, 1, 2, 2, 3, 0
+};
+size_t indices_count = sizeof(indices)/sizeof(indices[0]);
 
 VkVertexInputBindingDescription vk_vertex_get_binding_description() {
     VkVertexInputBindingDescription binding_description = {0};
@@ -220,42 +232,137 @@ uint32_t vk_find_memory_type(VkContext *context, uint32_t type_filter, VkMemoryP
     assert(false);
 }
 
-void vk_create_vertex_buffer(VkContext *context) {
+void vk_copy_buffer(VkContext *context, VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size) {
+    VkCommandBufferAllocateInfo alloc_info = {0};
+    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc_info.commandPool = context->command_pool;
+    alloc_info.commandBufferCount = 1;
+
+    VkCommandBuffer command_buffer;
+    vkAllocateCommandBuffers(context->device, &alloc_info, &command_buffer);
+
+    VkCommandBufferBeginInfo begin_info = {0};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(command_buffer, &begin_info);
+
+    VkBufferCopy copy_region = {0};
+    copy_region.srcOffset = 0; // Optional
+    copy_region.dstOffset = 0; // Optional
+    copy_region.size = size;
+    vkCmdCopyBuffer(command_buffer, src_buffer, dst_buffer, 1, &copy_region);
+
+    vkEndCommandBuffer(command_buffer);
+
+    VkSubmitInfo submit_info = {0};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &command_buffer;
+
+    vkQueueSubmit(context->graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vkQueueWaitIdle(context->graphics_queue);
+
+    vkFreeCommandBuffers(context->device, context->command_pool, 1, &command_buffer);
+}
+
+void vk_create_buffer(VkContext *context, VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer *buffer, VkDeviceMemory *buffer_memory) {
     VkBufferCreateInfo buffer_info = {0};
     buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    buffer_info.size = sizeof(vertices[0]) * vertices_count;
-    buffer_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    buffer_info.size = size;
+    buffer_info.usage = usage;
     buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    VkResult result = vkCreateBuffer(context->device, &buffer_info, NULL, &context->vertex_buffer);
+    VkResult result = vkCreateBuffer(context->device, &buffer_info, NULL, buffer);
     if (result != VK_SUCCESS) {
-        // failed to create vertex buffer!
+        // failed to create buffer!
         assert(false);
     }
 
     VkMemoryRequirements mem_requirements;
-    vkGetBufferMemoryRequirements(context->device, context->vertex_buffer, &mem_requirements);
+    vkGetBufferMemoryRequirements(context->device, *buffer, &mem_requirements);
 
     VkMemoryAllocateInfo alloc_info = {0};
     alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     alloc_info.allocationSize = mem_requirements.size;
-    alloc_info.memoryTypeIndex = vk_find_memory_type(
-        context,
-        mem_requirements.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
-    );
+    alloc_info.memoryTypeIndex = vk_find_memory_type(context, mem_requirements.memoryTypeBits, properties);
 
-    result = vkAllocateMemory(context->device, &alloc_info, NULL, &context->vertex_buffer_memory);
+    result = vkAllocateMemory(context->device, &alloc_info, NULL, buffer_memory);
     if (result != VK_SUCCESS) {
-        // failed to allocate vertex buffer memory!
+        // failed to allocate buffer memory!
         assert(false);
     }
-    vkBindBufferMemory(context->device, context->vertex_buffer, context->vertex_buffer_memory, 0);
 
-    void *data;
-    vkMapMemory(context->device, context->vertex_buffer_memory, 0, buffer_info.size, 0, &data);
-    memcpy(data, vertices, (size_t) buffer_info.size);
-    vkUnmapMemory(context->device, context->vertex_buffer_memory);
+    vkBindBufferMemory(context->device, *buffer, *buffer_memory, 0);
+}
+
+void vk_create_vertex_buffer(VkContext *context) {
+    VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices_count;
+
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_buffer_memory;
+    vk_create_buffer(
+        context,
+        buffer_size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &staging_buffer,
+        &staging_buffer_memory
+    );
+
+    void* data;
+    vkMapMemory(context->device, staging_buffer_memory, 0, buffer_size, 0, &data);
+    memcpy(data, vertices, (size_t) buffer_size);
+    vkUnmapMemory(context->device, staging_buffer_memory);
+
+    vk_create_buffer(
+        context,
+        buffer_size,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &context->vertex_buffer,
+        &context->vertex_buffer_memory
+    );
+    
+    vk_copy_buffer(context, staging_buffer, context->vertex_buffer, buffer_size);
+
+    vkDestroyBuffer(context->device, staging_buffer, NULL);
+    vkFreeMemory(context->device, staging_buffer_memory, NULL);
+}
+
+void vk_create_index_buffer(VkContext *context) {
+    VkDeviceSize buffer_size = sizeof(indices[0]) * indices_count;
+
+    VkBuffer staging_buffer;
+    VkDeviceMemory staging_buffer_memory;
+    vk_create_buffer(
+        context,
+        buffer_size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        &staging_buffer,
+        &staging_buffer_memory
+    );
+
+    void* data;
+    vkMapMemory(context->device, staging_buffer_memory, 0, buffer_size, 0, &data);
+    memcpy(data, indices, (size_t) buffer_size);
+    vkUnmapMemory(context->device, staging_buffer_memory);
+
+    vk_create_buffer(
+        context,
+        buffer_size,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        &context->index_buffer,
+        &context->index_buffer_memory
+    );
+
+    vk_copy_buffer(context, staging_buffer, context->index_buffer, buffer_size);
+
+    vkDestroyBuffer(context->device, staging_buffer, NULL);
+    vkFreeMemory(context->device, staging_buffer_memory, NULL);
 }
 
 void vk_create_instance(VkContext *context) {
@@ -981,7 +1088,11 @@ void vk_record_command_buffer(VkContext *context, VkCommandBuffer command_buffer
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
 
-    vkCmdDraw(command_buffer, (uint32_t)vertices_count, 1, 0, 0);
+    vkCmdBindIndexBuffer(command_buffer, context->index_buffer, 0, VK_INDEX_TYPE_UINT16);
+
+    // printf("vertices_count = %u\n", (uint32_t)vertices_count);
+    // vkCmdDraw(command_buffer, (uint32_t)vertices_count, 1, 0, 0);
+    vkCmdDrawIndexed(command_buffer, (uint32_t)indices_count, 1, 0, 0, 0);
     vkCmdEndRenderPass(command_buffer);
 
     {
@@ -1136,6 +1247,7 @@ void vk_init_vulkan(VkContext *context) {
     vk_create_framebuffers(context);
     vk_create_command_pool(context);
     vk_create_vertex_buffer(context);
+    vk_create_index_buffer(context);
     vk_create_command_buffers(context);
     vk_create_sync_objects(context);
 }
@@ -1150,6 +1262,9 @@ void vk_main_loop(VkContext *context) {
 
 void vk_cleanup(VkContext *context) {
     vk_cleanup_swap_chain(context);
+
+    vkDestroyBuffer(context->device, context->index_buffer, NULL);
+    vkFreeMemory(context->device, context->index_buffer_memory, NULL);
 
     vkDestroyBuffer(context->device, context->vertex_buffer, NULL);
     vkFreeMemory(context->device, context->vertex_buffer_memory, NULL);
