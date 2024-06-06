@@ -5,3 +5,5 @@ vk.dSYM
 vk
 shaders/frag.spv
 shaders/vert.spv
+fonts
+**/.DS_Store

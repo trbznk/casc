@@ -10,27 +10,33 @@
 #define CELL_INPUT_BUFFER_SIZE 1024
 #define CELL_OUTPUT_BUFFER_SIZE 1024
 
-// Postfix _ to ensure, that we don't use them directly. They are only
-// for initializing the GUI structure with default values.
-#define WINDOW_TITLE_ "casc"
-#define WINDOW_WIDTH_ 800
-#define WINDOW_HEIGHT_ 450
-#define FONT_SIZE_ 32
+const Color COLOR_DARK_GREEN = {18, 40, 36, 255};
+const Color COLOR_LIGHT_GREEN = {171, 225, 136, 255};
+const Color COLOR_MOONSTONE = {57, 162, 174, 255};
+const Color COLOR_POMP_AND_POWER = {129, 110, 148, 255};
+const Color COLOR_CHESTNUT = {162, 73, 54, 255};
 
 void init_gui() {
-    char* window_title = WINDOW_TITLE_;
-    int screen_width = WINDOW_WIDTH_;
-    int screen_height = WINDOW_HEIGHT_;
-    int font_size = FONT_SIZE_;
+    char* window_title = "casc";
+    int screen_width = 800;
+    int screen_height = 600;
     int cursor_position = 0;
 
     char cell_input_buffer[CELL_INPUT_BUFFER_SIZE];
+
+    // TODO: dont like this
     char *cell_output_buffer = NULL;
-    (void)cell_output_buffer;
     cell_input_buffer[0] = '\0';
 
     InitWindow(screen_width, screen_height, window_title);
 
+    // Font font = LoadFontEx("./fonts/monaspace-v1.101/fonts/otf/MonaspaceNeon-Regular.otf", 96, 0, 0);
+    Font font = LoadFontEx("./fonts/PkgTTF-Iosevka-30/Iosevka-Regular.ttf", 96, 0, 0);
+    Vector2 font_size = MeasureTextEx(font, "i", 48, 0);
+    Vector2 padding = { font_size.x/2, font_size.y/4 };
+    float line_height = font_size.y + 2*padding.y;
+
+    SetTextureFilter(font.texture, TEXTURE_FILTER_BILINEAR);
     SetTargetFPS(60);
 
     bool last_char_is_caret = false;
@@ -78,11 +84,11 @@ void init_gui() {
             }
         } else if (IsKeyPressed(KEY_LEFT)) {
             if (cursor_position > 0) {
-                cursor_position--;
+                cursor_position -= 1;
             }
         } else if (IsKeyPressed(KEY_RIGHT)) {
             if (cursor_position < (int)strlen(cell_input_buffer)) {
-                cursor_position++;
+                cursor_position += 1;
             }
         } else if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_ENTER)) {
             Worker _w = create_worker();
@@ -99,26 +105,35 @@ void init_gui() {
         //
         BeginDrawing();
             ClearBackground(WHITE);
-            DrawText(cell_input_buffer, 10, 10, font_size, BLACK);
+
+#if 0
             {
-                char slice[CELL_INPUT_BUFFER_SIZE];
-                for (int i = 0; i < cursor_position; i++) {
-                    slice[i] = cell_input_buffer[i];
-                }
-                slice[cursor_position] = '\0';
-                int cell_input_buffer_text_width = MeasureText(slice, font_size);
-                int start_pos_x = 10 + cell_input_buffer_text_width;
-                int start_pos_y = 10;
-                int end_pos_x   = start_pos_x;
-                int end_pos_y   = 10+font_size;
-                DrawLine(start_pos_x, start_pos_y, end_pos_x, end_pos_y, BLACK);
+                Color c = { 0xFF, 0x00, 0x00, 0xFF};
+                DrawRectangleLines(0, 0, screen_width, screen_height, c); 
+                DrawRectangleLines(0, 0, screen_width, line_height, c); 
+                DrawRectangleLines(0, line_height, screen_width, line_height, c); 
             }
-            DrawLine(0, 2*10+font_size, screen_width, 2*10+font_size, GRAY);
+#endif
+
+            Vector2 input_text_pos = { padding.x, padding.y, };
+            DrawTextEx(font, cell_input_buffer, input_text_pos, font_size.y, 0, COLOR_DARK_GREEN);
+
+            {
+                int x = padding.x + font_size.x * cursor_position;
+                int y = padding.y;
+                DrawRectangle(x, y, font_size.x/8, font_size.y, COLOR_POMP_AND_POWER);
+            }
+
+            DrawLine(0, line_height, screen_width, line_height, COLOR_MOONSTONE);
+
             if (cell_output_buffer != NULL) {
-                DrawText(cell_output_buffer, 10, 2*10+font_size+10, font_size, BLACK);
+                Vector2 output_text_pos = { padding.x, line_height + padding.y, };
+                DrawTextEx(font, cell_output_buffer, output_text_pos, font_size.y, 2, COLOR_DARK_GREEN);
             }
         EndDrawing();
     }
+
+    UnloadFont(font);
 
     CloseWindow();
 }
