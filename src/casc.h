@@ -1,10 +1,12 @@
-// TODO: maybe there shouldnt be ASTConstant. Just AST Symbol
-// TODO: remove Token fields from AST nodes
-
-#ifndef CASC_H
-#define CASC_H
+#pragma once
 
 #include <stdlib.h>
+
+//
+// Basic Types
+//
+
+typedef uint32_t u32;
 
 //
 // forward declarations
@@ -18,8 +20,6 @@ typedef struct Worker Worker;
 //
 // lexer
 //
-
-#define FIXED_STRING_SIZE 32
 
 extern const char *BUILTIN_FUNCTIONS[];
 extern const size_t BUILTIN_FUNCTIONS_COUNT;
@@ -49,14 +49,9 @@ typedef enum {
 
 typedef struct {
     TokenType type;
-
-    // TODO: I think we don't want to have fixed strings here in general
-    char text[FIXED_STRING_SIZE];
+    char text[64];
 } Token;
 
-// TODO: transform this into a lexer. This is not only for naming, but to make it clearer
-//       and differ it from the parser. Although we can implemente methods like peek_next_char
-//       and similar things more easily.
 typedef struct Lexer Lexer;
 struct Lexer {
     char* source;
@@ -129,6 +124,7 @@ struct AST {
         } integer;
 
         struct {
+            // TODO: fixed length?
             char* name;
         } symbol;
 
@@ -144,7 +140,7 @@ struct AST {
         } unaryop;
 
         struct {
-            Token name;
+            char name[64];
             ASTArray args;
         } func_call;
 
@@ -156,7 +152,7 @@ AST* create_ast_integer(Arena*, int64_t);
 AST* create_ast_symbol(Arena*, char*);
 AST* create_ast_binop(Arena*, AST*, AST*, OpType);
 AST* create_ast_unaryop(Arena*, AST*, OpType);
-AST* create_ast_func_call(Arena*, Token, ASTArray);
+AST* create_ast_func_call(Arena*, char*, ASTArray);
 AST* create_ast_empty(Arena*);
 
 void ast_array_append(ASTArray*, AST*);
@@ -208,8 +204,11 @@ void init_gui();
 
 struct Arena {
     void *memory;
+
     size_t offset;
     size_t size;
+
+    u32 reallocs_count;
 };
 
 Arena create_arena(size_t);
@@ -222,5 +221,3 @@ struct Worker {
 };
 
 Worker create_worker();
-
-#endif

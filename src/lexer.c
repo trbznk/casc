@@ -50,7 +50,7 @@ Token lexer_next_token(Lexer *lexer) {
     }
 
     if (isdigit(lexer_current_char(lexer))) {
-        char number_buffer[FIXED_STRING_SIZE] = "";
+        char number_buffer[64] = "";
         while (isdigit(lexer_current_char(lexer))) {
             char current_char = lexer_current_char(lexer);
             strncat(number_buffer, &current_char, 1);
@@ -61,7 +61,7 @@ Token lexer_next_token(Lexer *lexer) {
         return token;
     } else if (isalpha(lexer_current_char(lexer))) {
         // collect alphanumeric chars into the buffer
-        char buffer[FIXED_STRING_SIZE] = "";
+        char buffer[64] = "";
         size_t first = lexer->pos;
         while (
             isalpha(lexer_current_char(lexer)) ||
@@ -88,7 +88,6 @@ Token lexer_next_token(Lexer *lexer) {
             return token;
         }
     } else if (lexer_current_char(lexer) == '+') {
-        // TODO: Remove char -> text copy.
         Token token = { .type = TOKEN_PLUS };
         token.text[0] = lexer_current_char(lexer);
         lexer->pos += 1;

@@ -24,7 +24,7 @@ bool ast_match(AST* left, AST* right) {
                 return ast_match(left->binop.left, right->binop.left) && ast_match(left->binop.right, right->binop.right);
             case AST_FUNC_CALL: {
                 if (
-                    !strcmp(left->func_call.name.text, right->func_call.name.text) &&
+                    !strcmp(left->func_call.name, right->func_call.name) &&
                     left->func_call.args.size == right->func_call.args.size
                 ) {
                     for (size_t i = 0; i < left->func_call.args.size; i++) {
@@ -77,10 +77,10 @@ char *ast_to_debug_string(AST* node) {
         // TODO: args to debug string
         case AST_FUNC_CALL: {
             if (node->func_call.args.size == 1) {
-                sprintf(output, "FuncCall(%s, %s)", node->func_call.name.text, ast_to_debug_string(node->func_call.args.data[0])); break;
+                sprintf(output, "FuncCall(%s, %s)", node->func_call.name, ast_to_debug_string(node->func_call.args.data[0])); break;
             } else {
                 // TODO: multiple args to string
-                sprintf(output, "FuncCall(%s, args)", node->func_call.name.text); break;
+                sprintf(output, "FuncCall(%s, args)", node->func_call.name); break;
             }
         }
         case AST_EMPTY: sprintf(output, "Empty()"); break;
@@ -127,10 +127,10 @@ char *_ast_to_string(Arena *arena, AST* node, uint8_t op_precedence) {
         }
         case AST_FUNC_CALL: {
             if (node->func_call.args.size == 1) {
-                sprintf(output, "%s(%s)", node->func_call.name.text, _ast_to_string(arena, node->func_call.args.data[0], op_precedence)); break;
+                sprintf(output, "%s(%s)", node->func_call.name, _ast_to_string(arena, node->func_call.args.data[0], op_precedence)); break;
             } else {
                 // TODO: multiple args to string
-                sprintf(output, "%s(args)", node->func_call.name.text); break;
+                sprintf(output, "%s(args)", node->func_call.name); break;
             }
         }
         case AST_EMPTY: break;
@@ -341,40 +341,40 @@ AST* diff(Worker *w, AST *expr, AST *var) {
 AST* interp_func_call(Worker *w, AST* node) {
     // TODO: we need a proper system for checking and using args (function definitions and function signatures)
 
-    Token name = node->func_call.name;
+    char *func_name = node->func_call.name;
 
     for (size_t i = 0; i < node->func_call.args.size; i++) {
         node->func_call.args.data[i] = interp(w, node->func_call.args.data[i]);
     }
-    // for most cases we only use first arg for now
-    // TODO: remove this later
-    AST *arg = node->func_call.args.data[0];
 
-    if (!strcmp(name.text, "sqrt") && arg->type == AST_INTEGER) {
-        double result = sqrt((double)arg->integer.value);
-        if (fmod((double)arg->integer.value, result) == 0.0) {
+    ASTArray args = node->func_call.args;
+
+    if (!strcmp(func_name, "sqrt") && args.data[0]->type == AST_INTEGER) {
+        double result = sqrt((double)args.data[0]->integer.value);
+
+        if (fmod((double)args.data[0]->integer.value, result) == 0.0) {
             return create_ast_integer(&w->arena, (int)result);
         }
 
         // check for perfect square
         // @Speed: this is probably an inefficient way to compute the biggest perfect sqaure factor of a given number
-        for (int q = arg->integer.value; q > 1; q--) {
+        for (int q = args.data[0]->integer.value; q > 1; q--) {
             double sqrt_of_q = sqrtf((double)q);
             bool is_perfect_square = sqrt_of_q == floor(sqrt_of_q);
-            if (is_perfect_square && arg->integer.value % q == 0) {
-                int p = arg->integer.value / q;
-                ASTArray args = {0};
-                ast_array_append(&args, create_ast_integer(&w->arena, p));
-                return create_ast_binop(&w->arena, create_ast_integer(&w->arena, (int64_t)sqrt_of_q), create_ast_func_call(&w->arena, name, args), OP_MUL);
+            if (is_perfect_square && args.data[0]->integer.value % q == 0) {
+                int p = args.data[0]->integer.value / q;
+                ASTArray new_args = {0};
+                ast_array_append(&new_args, create_ast_integer(&w->arena, p));
+                return create_ast_binop(&w->arena, create_ast_integer(&w->arena, (int64_t)sqrt_of_q), create_ast_func_call(&w->arena, func_name, new_args), OP_MUL);
             }
         }
-    } else if (!strcmp(name.text, "ln")) {
-        if (ast_match(arg, create_ast_symbol(&w->arena, "e"))) {
+    } else if (!strcmp(func_name, "ln")) {
+        if (ast_match(args.data[0], create_ast_symbol(&w->arena, "e"))) {
             return create_ast_integer(&w->arena, 1);
-        } else if (ast_match(arg, create_ast_integer(&w->arena, 1))) {
+        } else if (ast_match(args.data[0], create_ast_integer(&w->arena, 1))) {
             return create_ast_integer(&w->arena, 0);
         }
-    } else if (!strcmp(name.text, "log")) {
+    } else if (!strcmp(func_name, "log")) {
         if (node->func_call.args.size == 2) {
             // log_b(y) = x
             // b^x = y
@@ -388,6 +388,7 @@ AST* interp_func_call(Worker *w, AST* node) {
         } else {
             assert(false);
         }
+    // TODO: these ast_match_string calls are bad for memory
     } else if (ast_match_string(node, "sin(pi)")) {
         return create_ast_integer(&w->arena, 0);
     } else if (ast_match_string(node, "cos(0)")) {
@@ -396,7 +397,7 @@ AST* interp_func_call(Worker *w, AST* node) {
         return create_ast_integer(&w->arena, 0);
     } else if (ast_match_string(node, "cos(pi)")) {
         return create_ast_integer(&w->arena, -1);
-    } else if (!strcmp(name.text, "diff")) {
+    } else if (!strcmp(func_name, "diff")) {
         AST* diff_var;
 
         if (node->func_call.args.size == 1) {
@@ -429,7 +430,6 @@ AST* interp_func_call(Worker *w, AST* node) {
 }
 
 AST* interp(Worker *w, AST* node) {
-    // TODO: unpack here. For example interp_binop(node.binop)
     switch (node->type) {
         case AST_BINOP:
             return interp_binop(w, node);

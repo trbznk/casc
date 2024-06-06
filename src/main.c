@@ -8,10 +8,13 @@
 
 #include "casc.h"
 
-#define ARENA_SIZE 100*1024
+#define ARENA_SIZE 1024
 
 Arena create_arena(size_t size) {
-    return (Arena){ .memory=malloc(size), .offset=0, .size=size };
+    Arena arena = {0};
+    arena.memory = malloc(size);
+    arena.size = size;
+    return arena;
 }
 
 void arena_free(Arena *arena) {
@@ -26,7 +29,26 @@ void arena_free(Arena *arena) {
 }
 
 void *arena_alloc(Arena *arena, size_t size) {
-    // TODO: add realloc here to make initial size needed smaller
+    size_t free_capacity = arena->size - arena->offset;
+
+#if 1
+    printf("size=%zu, free_capacity=%zu, reallocs_count=%u\n", size, free_capacity, arena->reallocs_count);
+#endif
+
+    if (free_capacity <= size) {
+        size_t new_size;
+
+        if (size < ARENA_SIZE) {
+            new_size = arena->size + ARENA_SIZE;
+        } else {
+            // Do we need padding here? @note
+            new_size = arena->size + size;
+        }
+
+        arena->size = new_size ;
+        arena->memory = realloc(arena->memory, new_size);
+        arena->reallocs_count += 1;
+    }
 
     // current position in the memory
     void *memory = arena->memory + arena->offset;
@@ -34,9 +56,10 @@ void *arena_alloc(Arena *arena, size_t size) {
     // compute the new position in the memory
     arena->offset = arena->offset + size;
 
-    double arena_memory_used = (double)arena->offset / (double)arena->size;
-    assert(arena_memory_used < 0.5);
+    // double arena_memory_used = (double)arena->offset / (double)arena->size;
+    // assert(arena_memory_used < 0.5);
     assert(arena->offset < arena->size);
+
 #if 0
     printf("arena_memory_used = %.2f\n", arena_memory_used);
 #endif
@@ -227,15 +250,13 @@ int main(int argc, char *argv[]) {
         //     printf("[%zu] %s\n", i, ast_to_debug_string(a.data[i]));
         // }
         
-        char *source = "diff((x^3+y)^2, x)";
+        // char *source = "sqrt(2)*sin(x^2)+3*abcd";
+        char *source = "sin(2)";
 
         AST *output = interp_from_string(w, source);
-        ASTArray a = ast_to_flat_array(&w->arena, output);
-        for (size_t i = 0; i < a.size; i++) {
-            printf("[%zu] %s\n", i, ast_to_debug_string(a.data[i]));
-        }
+        (void)output;
 
-        printf("%s\n", ast_to_string(output));
+        // printf("%s\n", ast_to_string(output));
         printf("%s\n", ast_to_debug_string(output));
 
         arena_free(&w->arena);

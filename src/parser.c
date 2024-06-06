@@ -35,7 +35,7 @@ AST *parse_exp(Worker* w) {
                 }
 
                 parser_eat(w, TOKEN_R_PAREN);
-                return create_ast_func_call(&w->arena, token, args);
+                return create_ast_func_call(&w->arena, token.text, args);
             } else {
                 parser_eat(w, TOKEN_IDENTIFIER);
                 return create_ast_symbol(&w->arena, token.text);

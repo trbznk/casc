@@ -105,10 +105,10 @@ AST* create_ast_unaryop(Arena* arena, AST* expr, OpType type) {
     return node;
 }
 
-AST* create_ast_func_call(Arena* arena, Token name, ASTArray args) {
+AST* create_ast_func_call(Arena* arena, char *name, ASTArray args) {
     AST *node = arena_alloc(arena, sizeof(AST));
     node->type = AST_FUNC_CALL;
-    node->func_call.name = name;
+    strcpy(node->func_call.name, name);
     node->func_call.args = args;
     return node;
 }
