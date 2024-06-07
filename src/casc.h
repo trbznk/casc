@@ -6,7 +6,10 @@
 // Basic Types
 //
 
+typedef int32_t i32;
+typedef int64_t i64;
 typedef uint32_t u32;
+typedef double f64;
 
 //
 // forward declarations
@@ -72,13 +75,14 @@ bool is_builtin_constant(char*);
 // ast
 //
 
-#define INTEGER(value) create_ast_integer(&w->arena, value)
-#define SYMBOL(name) create_ast_symbol(&w->arena, name)
-#define ADD(left, right) create_ast_binop(&w->arena, left, right, OP_ADD)
-#define SUB(left, right) create_ast_binop(&w->arena, left, right, OP_SUB)
-#define MUL(left, right) create_ast_binop(&w->arena, left, right, OP_MUL)
-#define DIV(left, right) create_ast_binop(&w->arena, left, right, OP_DIV)
-#define POW(left, right) create_ast_binop(&w->arena, left, right, OP_POW)
+#define create_ast_integer(value) _create_ast_integer(&worker->arena, value)
+#define create_ast_real(value) _create_ast_real(&worker->arena, value)
+#define create_ast_symbol(name) _create_ast_symbol(&worker->arena, name)
+#define create_ast_add(left, right) _create_ast_binop(&worker->arena, left, right, OP_ADD)
+#define create_ast_sub(left, right) _create_ast_binop(&worker->arena, left, right, OP_SUB)
+#define create_ast_mul(left, right) _create_ast_binop(&worker->arena, left, right, OP_MUL)
+#define create_ast_div(left, right) _create_ast_binop(&worker->arena, left, right, OP_DIV)
+#define create_ast_pow(left, right) _create_ast_binop(&worker->arena, left, right, OP_POW)
 
 typedef struct ASTArray ASTArray;
 
@@ -97,6 +101,7 @@ typedef enum {
 
 typedef enum {
     AST_INTEGER,
+    AST_REAL,
     AST_SYMBOL,
     AST_BINOP,
     AST_UNARYOP,
@@ -120,8 +125,12 @@ struct AST {
     union {
 
         struct {
-            int64_t value;
+            i64 value;
         } integer;
+
+        struct {
+            f64 value;
+        } real;
 
         struct {
             // TODO: fixed length?
@@ -148,9 +157,10 @@ struct AST {
     };
 };
 
-AST* create_ast_integer(Arena*, int64_t);
-AST* create_ast_symbol(Arena*, char*);
-AST* create_ast_binop(Arena*, AST*, AST*, OpType);
+AST* _create_ast_integer(Arena*, i64);
+AST* _create_ast_real(Arena*, f64);
+AST* _create_ast_symbol(Arena*, char*);
+AST* _create_ast_binop(Arena*, AST*, AST*, OpType);
 AST* create_ast_unaryop(Arena*, AST*, OpType);
 AST* create_ast_func_call(Arena*, char*, ASTArray);
 AST* create_ast_empty(Arena*);
@@ -190,8 +200,8 @@ bool ast_match_type(AST*, AST*);
 char *_ast_to_string(Arena*, AST*, uint8_t);
 char *ast_to_debug_string(AST*);
 
-#define ast_to_string(ast) _ast_to_string(&w->arena, ast, 0)
-#define ast_match_string(ast, s) (bool)!strcmp(_ast_to_string(&w->arena, ast, 0), s)
+#define ast_to_string(ast) _ast_to_string(&worker->arena, ast, 0)
+#define ast_match_string(ast, s) (bool)!strcmp(_ast_to_string(&worker->arena, ast, 0), s)
 
 //
 // gui

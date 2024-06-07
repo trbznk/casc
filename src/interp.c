@@ -71,6 +71,7 @@ char *ast_to_debug_string(AST* node) {
     char *output = malloc(1024);
     switch (node->type) {
         case AST_INTEGER: sprintf(output, "%s(%lld)", ast_type_to_debug_string(node->type), node->integer.value); break;
+        case AST_REAL: sprintf(output, "%s(%f)", ast_type_to_debug_string(node->type), node->real.value); break;
         case AST_SYMBOL: sprintf(output, "%s(%s)", ast_type_to_debug_string(node->type), node->symbol.name); break;
         case AST_BINOP: sprintf(output, "%s(%s, %s)", op_type_to_debug_string(node->binop.type), ast_to_debug_string(node->binop.left), ast_to_debug_string(node->binop.right)); break;
         case AST_UNARYOP: sprintf(output, "%s(%s)", op_type_to_debug_string(node->unaryop.type), ast_to_debug_string(node->unaryop.expr)); break;
@@ -139,55 +140,55 @@ char *_ast_to_string(Arena *arena, AST* node, uint8_t op_precedence) {
     return output;
 }
 
-AST* interp_binop_add(Worker *w, AST* node) {
-    AST* left = interp(w, node->binop.left);
-    AST* right = interp(w, node->binop.right);
+AST* interp_binop_add(Worker *worker, AST* node) {
+    AST* left = interp(worker, node->binop.left);
+    AST* right = interp(worker, node->binop.right);
 
     if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
-        return create_ast_integer(&w->arena, left->integer.value + right->integer.value);
-    } else if (ast_match(left, INTEGER(0))) {
+        return _create_ast_integer(&worker->arena, left->integer.value + right->integer.value);
+    } else if (ast_match(left, create_ast_integer(0))) {
         return right;
-    } else if (ast_match(right, INTEGER(0))) {
+    } else if (ast_match(right, create_ast_integer(0))) {
         return left;
     } else if (ast_match(left, right)) {
-        return create_ast_binop(&w->arena, create_ast_integer(&w->arena, 2), left, OP_MUL);
-    } else if (ast_match_type(left, create_ast_binop(&w->arena, create_ast_integer(&w->arena, 1), create_ast_integer(&w->arena, 1), OP_DIV)) && ast_match_type(right, create_ast_binop(&w->arena, create_ast_integer(&w->arena, 1), create_ast_integer(&w->arena, 1), OP_DIV))) {
+        return _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, 2), left, OP_MUL);
+    } else if (ast_match_type(left, _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, 1), _create_ast_integer(&worker->arena, 1), OP_DIV)) && ast_match_type(right, _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, 1), _create_ast_integer(&worker->arena, 1), OP_DIV))) {
         // a/b + c/d
         int64_t a = left->binop.left->integer.value;
         int64_t b = left->binop.right->integer.value;
         int64_t c = right->binop.left->integer.value;
         int64_t d = right->binop.right->integer.value;
-        AST* r = create_ast_binop(&w->arena, create_ast_integer(&w->arena, a*d+c*b), create_ast_integer(&w->arena, b*d), OP_DIV);
-        return interp_binop_div(w, r);
+        AST* r = _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, a*d+c*b), _create_ast_integer(&worker->arena, b*d), OP_DIV);
+        return interp_binop_div(worker, r);
     } else if (left->type == AST_INTEGER && right->type == AST_BINOP && right->binop.type == OP_DIV) {
         // c + a/b
         // -> (cb)/b + a/b
-        AST* r = create_ast_binop(&w->arena, create_ast_binop(&w->arena, create_ast_binop(&w->arena, left, right->binop.right, OP_MUL), right->binop.right, OP_DIV), right, OP_ADD);
-        return interp_binop(w, r);
+        AST* r = _create_ast_binop(&worker->arena, _create_ast_binop(&worker->arena, _create_ast_binop(&worker->arena, left, right->binop.right, OP_MUL), right->binop.right, OP_DIV), right, OP_ADD);
+        return interp_binop(worker, r);
     } else if (left->type == AST_BINOP && left->binop.type == OP_MUL) {
         if (ast_match(left->binop.right, right)) {
-            AST* new_left = interp_binop(w, create_ast_binop(&w->arena, create_ast_integer(&w->arena, 1), left->binop.left, OP_ADD));
-            return create_ast_binop(&w->arena, new_left, right, OP_MUL);
+            AST* new_left = interp_binop(worker, _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, 1), left->binop.left, OP_ADD));
+            return _create_ast_binop(&worker->arena, new_left, right, OP_MUL);
         }
     }
-    return create_ast_binop(&w->arena, left, right, OP_ADD);
+    return _create_ast_binop(&worker->arena, left, right, OP_ADD);
 }
 
-AST* interp_binop_sub(Worker *w, AST* node) {
-    AST* left = interp(w, node->binop.left);
-    AST* right = interp(w, node->binop.right);
+AST* interp_binop_sub(Worker *worker, AST* node) {
+    AST* left = interp(worker, node->binop.left);
+    AST* right = interp(worker, node->binop.right);
 
     if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
-        return create_ast_integer(&w->arena, left->integer.value - right->integer.value);
-    } else if (ast_match_type(left, INTEGER(1)) && ast_match_type(right, DIV(INTEGER(1), INTEGER(1)))) {
+        return _create_ast_integer(&worker->arena, left->integer.value - right->integer.value);
+    } else if (ast_match_type(left, create_ast_integer(1)) && ast_match_type(right, create_ast_div(create_ast_integer(1), create_ast_integer(1)))) {
         // a - b/c -> ac/c - b/c = (ac-b)/c
         AST* a = left;
         AST* b = right->binop.left;
         AST* c = right->binop.right;
-        return interp_binop_div(w,
-            create_ast_binop(&w->arena, 
-                create_ast_binop(&w->arena,
-                    create_ast_binop(&w->arena, a, c, OP_MUL),
+        return interp_binop_div(worker,
+            _create_ast_binop(&worker->arena, 
+                _create_ast_binop(&worker->arena,
+                    _create_ast_binop(&worker->arena, a, c, OP_MUL),
                     b,
                     OP_SUB
                 ),
@@ -195,117 +196,117 @@ AST* interp_binop_sub(Worker *w, AST* node) {
                 OP_DIV
             )
         );
-    } else if (ast_match_type(left, DIV(INTEGER(1), INTEGER(1))) && ast_match_type(right, INTEGER(1))) {
+    } else if (ast_match_type(left, create_ast_div(create_ast_integer(1), create_ast_integer(1))) && ast_match_type(right, create_ast_integer(1))) {
         // a/b - c -> a/b - cb/b = (a-cb)/b
         AST *a = left->binop.left;
         AST *b = left->binop.right;
         AST *c = right;
-        AST *cb = create_ast_binop(&w->arena, c, b, OP_MUL);
-        AST *numerator = create_ast_binop(&w->arena, a, cb, OP_SUB);
-        return interp_binop_div(w, create_ast_binop(&w->arena, numerator, b, OP_DIV));
-    } else if (ast_match(right, create_ast_integer(&w->arena, 0))) {
+        AST *cb = _create_ast_binop(&worker->arena, c, b, OP_MUL);
+        AST *numerator = _create_ast_binop(&worker->arena, a, cb, OP_SUB);
+        return interp_binop_div(worker, _create_ast_binop(&worker->arena, numerator, b, OP_DIV));
+    } else if (ast_match(right, _create_ast_integer(&worker->arena, 0))) {
         return left;
     }
 
     return node;
 }
 
-AST* interp_binop_mul(Worker *w, AST* node) {
-    AST* left = interp(w, node->binop.left);
-    AST* right = interp(w, node->binop.right);
+AST* interp_binop_mul(Worker *worker, AST* node) {
+    AST* left = interp(worker, node->binop.left);
+    AST* right = interp(worker, node->binop.right);
     if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
-        return create_ast_integer(&w->arena, left->integer.value * right->integer.value);
-    } else if (ast_match(left, create_ast_integer(&w->arena, 0)) || ast_match(create_ast_integer(&w->arena, 0), right)) {
-        return create_ast_integer(&w->arena, 0);
+        return _create_ast_integer(&worker->arena, left->integer.value * right->integer.value);
+    } else if (ast_match(left, _create_ast_integer(&worker->arena, 0)) || ast_match(_create_ast_integer(&worker->arena, 0), right)) {
+        return _create_ast_integer(&worker->arena, 0);
     } else if (ast_match(left, right)) {
-        return interp_binop_pow(w, create_ast_binop(&w->arena, left, create_ast_integer(&w->arena, 2), OP_POW));
-    } else if (ast_match_type(left, DIV(INTEGER(1), INTEGER(1))) && ast_match_type(right, DIV(INTEGER(1), INTEGER(1)))) {
+        return interp_binop_pow(worker, _create_ast_binop(&worker->arena, left, _create_ast_integer(&worker->arena, 2), OP_POW));
+    } else if (ast_match_type(left, create_ast_div(create_ast_integer(1), create_ast_integer(1))) && ast_match_type(right, create_ast_div(create_ast_integer(1), create_ast_integer(1)))) {
         // a/b * c/d -> ac/bd
         AST *a = left->binop.left;
         AST *b = left->binop.right;
         AST *c = right->binop.left;
         AST *d = right->binop.right;
-        AST *ac = create_ast_binop(&w->arena, a, c, OP_MUL);
-        AST *bd = create_ast_binop(&w->arena, b, d, OP_MUL);
-        return interp_binop_div(w, create_ast_binop(&w->arena, ac, bd, OP_DIV));
-    } else if (ast_match(left, create_ast_integer(&w->arena, 1)) || ast_match(right, create_ast_integer(&w->arena, 1))) {
-        if (ast_match(left, create_ast_integer(&w->arena, 1))) {
+        AST *ac = _create_ast_binop(&worker->arena, a, c, OP_MUL);
+        AST *bd = _create_ast_binop(&worker->arena, b, d, OP_MUL);
+        return interp_binop_div(worker, _create_ast_binop(&worker->arena, ac, bd, OP_DIV));
+    } else if (ast_match(left, _create_ast_integer(&worker->arena, 1)) || ast_match(right, _create_ast_integer(&worker->arena, 1))) {
+        if (ast_match(left, _create_ast_integer(&worker->arena, 1))) {
             return right;
         } else {
             return left;
         }
     }
-    return create_ast_binop(&w->arena, left, right, OP_MUL);
+    return _create_ast_binop(&worker->arena, left, right, OP_MUL);
 }
 
-AST* interp_binop_div(Worker *w, AST* node) {
-    AST* left = interp(w, node->binop.left);
-    AST* right = interp(w, node->binop.right);
+AST* interp_binop_div(Worker *worker, AST* node) {
+    AST* left = interp(worker, node->binop.left);
+    AST* right = interp(worker, node->binop.right);
     if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
         if (left->integer.value % right->integer.value == 0) {
-            return create_ast_integer(&w->arena, left->integer.value / right->integer.value);
+            return _create_ast_integer(&worker->arena, left->integer.value / right->integer.value);
         } else {
-            return create_ast_binop(&w->arena, left, right, OP_DIV);
+            return _create_ast_binop(&worker->arena, left, right, OP_DIV);
         }
     } else if (left->type == AST_INTEGER && right->type == AST_BINOP && right->binop.type == OP_DIV) {
-        AST* r = create_ast_binop(&w->arena, create_ast_binop(&w->arena, left, right->binop.left, OP_MUL), right->binop.right, OP_DIV);
-        return interp_binop(w, r);
+        AST* r = _create_ast_binop(&worker->arena, _create_ast_binop(&worker->arena, left, right->binop.left, OP_MUL), right->binop.right, OP_DIV);
+        return interp_binop(worker, r);
     }
-    return create_ast_binop(&w->arena, left, right, OP_DIV);
+    return _create_ast_binop(&worker->arena, left, right, OP_DIV);
 }
 
-AST *interp_binop_pow(Worker *w, AST *node) {
-    AST* left = interp(w, node->binop.left);
-    AST* right = interp(w, node->binop.right);
+AST *interp_binop_pow(Worker *worker, AST *node) {
+    AST* left = interp(worker, node->binop.left);
+    AST* right = interp(worker, node->binop.right);
     if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
         long double l = (long double)left->integer.value;
         long double r = (long double)right->integer.value;
         int64_t result = (int64_t)powl(l, r);
-        return create_ast_integer(&w->arena, result);
-    } else if (ast_match(right, create_ast_integer(&w->arena, 0))) {
-        return create_ast_integer(&w->arena, 1);
-    } else if (ast_match(right, create_ast_integer(&w->arena, 1))) {
+        return _create_ast_integer(&worker->arena, result);
+    } else if (ast_match(right, _create_ast_integer(&worker->arena, 0))) {
+        return _create_ast_integer(&worker->arena, 1);
+    } else if (ast_match(right, _create_ast_integer(&worker->arena, 1))) {
         return left;
     }
-    return create_ast_binop(&w->arena, left, right, OP_POW);
+    return _create_ast_binop(&worker->arena, left, right, OP_POW);
 }
 
-AST* interp_binop(Worker *w, AST* node) {
+AST* interp_binop(Worker *worker, AST* node) {
     switch (node->binop.type) {
-        case OP_ADD: return interp_binop_add(w, node);
-        case OP_SUB: return interp_binop_sub(w, node);
-        case OP_MUL: return interp_binop_mul(w, node);
-        case OP_DIV: return interp_binop_div(w, node);
-        case OP_POW: return interp_binop_pow(w, node);
+        case OP_ADD: return interp_binop_add(worker, node);
+        case OP_SUB: return interp_binop_sub(worker, node);
+        case OP_MUL: return interp_binop_mul(worker, node);
+        case OP_DIV: return interp_binop_div(worker, node);
+        case OP_POW: return interp_binop_pow(worker, node);
         default: assert(false);
     }
 }
 
-AST* interp_unaryop(Worker *w, AST* node) {
-    AST* expr = interp(w, node->unaryop.expr);
+AST* interp_unaryop(Worker *worker, AST* node) {
+    AST* expr = interp(worker, node->unaryop.expr);
     OpType op_type = node->unaryop.type;
 
     if (expr->type == AST_INTEGER) {
         switch (op_type) {
-            case OP_UADD: return create_ast_integer(&w->arena, +expr->integer.value);
-            case OP_USUB: return create_ast_integer(&w->arena, -expr->integer.value);
+            case OP_UADD: return _create_ast_integer(&worker->arena, +expr->integer.value);
+            case OP_USUB: return _create_ast_integer(&worker->arena, -expr->integer.value);
             default: assert(false);
         }
     }
 
-    return create_ast_unaryop(&w->arena, expr, op_type);
+    return create_ast_unaryop(&worker->arena, expr, op_type);
 }
 
-AST* diff(Worker *w, AST *expr, AST *var) {
-    (void)w;
+AST* diff(Worker *worker, AST *expr, AST *var) {
+    (void)worker;
     (void)var;
 
     switch (expr->type) {
         case AST_SYMBOL: {
             if (ast_match(expr, var)) {
-                return INTEGER(1);
+                return create_ast_integer(1);
             } else {
-                return INTEGER(0);
+                return create_ast_integer(0);
             }
         }
         case AST_BINOP: {
@@ -317,15 +318,15 @@ AST* diff(Worker *w, AST *expr, AST *var) {
                     AST* b = expr->binop.left;
                     AST* n = expr->binop.right;
                     // x^n -> n * x^(n-1) * x'
-                    AST* result = MUL(MUL(n, POW(b, SUB(n, INTEGER(1)))), diff(w, b, var));
-                    return interp_binop_mul(w, result);
+                    AST* result = create_ast_mul(create_ast_mul(n, create_ast_pow(b, create_ast_sub(n, create_ast_integer(1)))), diff(worker, b, var));
+                    return interp_binop_mul(worker, result);
                 }
                 case OP_ADD: {
                     // a + b -> a' + b'
-                    AST *dl = diff(w, expr->binop.left, var);
-                    AST *dr = diff(w, expr->binop.right, var);
-                    AST *result = ADD(dl, dr);
-                    return interp_binop_add(w, result);
+                    AST *dl = diff(worker, expr->binop.left, var);
+                    AST *dr = diff(worker, expr->binop.right, var);
+                    AST *result = create_ast_add(dl, dr);
+                    return interp_binop_add(worker, result);
                 }
                 default:
                     printf("op '%s' not implemented\n", op_type_to_debug_string(expr->binop.type));
@@ -338,13 +339,43 @@ AST* diff(Worker *w, AST *expr, AST *var) {
     }
 }
 
-AST* interp_func_call(Worker *w, AST* node) {
+AST *interp_sin(Worker *worker, AST* node) {
+    assert(node->func_call.args.size == 1);
+    AST *arg = node->func_call.args.data[0];
+
+    if (ast_match(arg, create_ast_symbol("pi"))) {
+        return create_ast_integer(0);
+    } else if (arg->type == AST_INTEGER) {
+        return create_ast_real(sinf(arg->integer.value));
+    }
+    
+    return node;
+}
+
+AST *interp_cos(Worker *worker, AST* node) {
+    assert(node->func_call.args.size == 1);
+    AST *arg = node->func_call.args.data[0];
+    
+    if (ast_match(arg, create_ast_integer(0))) {
+        return create_ast_integer(1);
+    } else if (ast_match(arg, create_ast_div(create_ast_symbol("pi"), create_ast_integer(2)))) {
+        return create_ast_integer(0);
+    } else if (ast_match(arg, create_ast_symbol("pi"))) {
+        return create_ast_integer(-1);
+    } else if (arg->type == AST_INTEGER) {
+        return create_ast_real(cosf(arg->integer.value));
+    }
+
+    return node;
+}
+
+AST* interp_func_call(Worker *worker, AST* node) {
     // TODO: we need a proper system for checking and using args (function definitions and function signatures)
 
     char *func_name = node->func_call.name;
 
     for (size_t i = 0; i < node->func_call.args.size; i++) {
-        node->func_call.args.data[i] = interp(w, node->func_call.args.data[i]);
+        node->func_call.args.data[i] = interp(worker, node->func_call.args.data[i]);
     }
 
     ASTArray args = node->func_call.args;
@@ -353,7 +384,7 @@ AST* interp_func_call(Worker *w, AST* node) {
         double result = sqrt((double)args.data[0]->integer.value);
 
         if (fmod((double)args.data[0]->integer.value, result) == 0.0) {
-            return create_ast_integer(&w->arena, (int)result);
+            return _create_ast_integer(&worker->arena, (int)result);
         }
 
         // check for perfect square
@@ -364,15 +395,15 @@ AST* interp_func_call(Worker *w, AST* node) {
             if (is_perfect_square && args.data[0]->integer.value % q == 0) {
                 int p = args.data[0]->integer.value / q;
                 ASTArray new_args = {0};
-                ast_array_append(&new_args, create_ast_integer(&w->arena, p));
-                return create_ast_binop(&w->arena, create_ast_integer(&w->arena, (int64_t)sqrt_of_q), create_ast_func_call(&w->arena, func_name, new_args), OP_MUL);
+                ast_array_append(&new_args, _create_ast_integer(&worker->arena, p));
+                return _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, (int64_t)sqrt_of_q), create_ast_func_call(&worker->arena, func_name, new_args), OP_MUL);
             }
         }
     } else if (!strcmp(func_name, "ln")) {
-        if (ast_match(args.data[0], create_ast_symbol(&w->arena, "e"))) {
-            return create_ast_integer(&w->arena, 1);
-        } else if (ast_match(args.data[0], create_ast_integer(&w->arena, 1))) {
-            return create_ast_integer(&w->arena, 0);
+        if (ast_match(args.data[0], _create_ast_symbol(&worker->arena, "e"))) {
+            return _create_ast_integer(&worker->arena, 1);
+        } else if (ast_match(args.data[0], _create_ast_integer(&worker->arena, 1))) {
+            return _create_ast_integer(&worker->arena, 0);
         }
     } else if (!strcmp(func_name, "log")) {
         if (node->func_call.args.size == 2) {
@@ -380,28 +411,23 @@ AST* interp_func_call(Worker *w, AST* node) {
             // b^x = y
             AST* y = node->func_call.args.data[0];
             AST* b = node->func_call.args.data[1];
-            if (ast_match(y, create_ast_integer(&w->arena, 1))) {
-                return create_ast_integer(&w->arena, 0);
+            if (ast_match(y, _create_ast_integer(&worker->arena, 1))) {
+                return _create_ast_integer(&worker->arena, 0);
             } else if (ast_match(y, b)) {
-                return create_ast_integer(&w->arena, 1);
+                return _create_ast_integer(&worker->arena, 1);
             }
         } else {
             assert(false);
         }
-    // TODO: these ast_match_string calls are bad for memory
-    } else if (ast_match_string(node, "sin(pi)")) {
-        return create_ast_integer(&w->arena, 0);
-    } else if (ast_match_string(node, "cos(0)")) {
-        return create_ast_integer(&w->arena, 1);
-    } else if (ast_match_string(node, "cos(pi/2)")) {
-        return create_ast_integer(&w->arena, 0);
-    } else if (ast_match_string(node, "cos(pi)")) {
-        return create_ast_integer(&w->arena, -1);
+    } else if (!strcmp(func_name, "sin")) {
+        return interp_sin(worker, node);
+    } else if (!strcmp(func_name, "cos")) {
+        return interp_cos(worker, node);
     } else if (!strcmp(func_name, "diff")) {
         AST* diff_var;
 
         if (node->func_call.args.size == 1) {
-            ASTArray nodes = ast_to_flat_array(&w->arena, node);
+            ASTArray nodes = ast_to_flat_array(&worker->arena, node);
             bool symbol_seen = false;
             AST *symbol;
             for (size_t i = 0; i < nodes.size; i++) {
@@ -423,23 +449,23 @@ AST* interp_func_call(Worker *w, AST* node) {
             assert(false);
         }
 
-        return diff(w, node->func_call.args.data[0], diff_var);
+        return diff(worker, node->func_call.args.data[0], diff_var);
     }
 
     return node;
 }
 
-AST* interp(Worker *w, AST* node) {
+AST* interp(Worker *worker, AST* node) {
     switch (node->type) {
         case AST_BINOP:
-            return interp_binop(w, node);
+            return interp_binop(worker, node);
         case AST_UNARYOP:
-            return interp_unaryop(w, node);
+            return interp_unaryop(worker, node);
         case AST_INTEGER:
         case AST_SYMBOL:
             return node;
         case AST_FUNC_CALL:
-            return interp_func_call(w, node);
+            return interp_func_call(worker, node);
         case AST_EMPTY:
             return node;
         default:
@@ -448,11 +474,11 @@ AST* interp(Worker *w, AST* node) {
     }
 }
 
-AST* interp_from_string(Worker *w, char *source) {
-    w->lexer.source = source;
+AST* interp_from_string(Worker *worker, char *source) {
+    worker->lexer.source = source;
 
-    AST* ast = parse(w);
-    AST* output = interp(w, ast);
+    AST* ast = parse(worker);
+    AST* output = interp(worker, ast);
     
     return output;
 }

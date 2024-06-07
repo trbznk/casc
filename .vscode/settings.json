@@ -10,6 +10,7 @@
         "ratio": "c",
         "tuple": "c",
         "__config": "c",
-        "math.h": "c"
+        "math.h": "c",
+        "ios": "c"
     }
 }

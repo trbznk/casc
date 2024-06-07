@@ -31,7 +31,7 @@ void arena_free(Arena *arena) {
 void *arena_alloc(Arena *arena, size_t size) {
     size_t free_capacity = arena->size - arena->offset;
 
-#if 1
+#if 0
     printf("size=%zu, free_capacity=%zu, reallocs_count=%u\n", size, free_capacity, arena->reallocs_count);
 #endif
 
@@ -78,14 +78,14 @@ void test_ast(char *source, char *test_source) {
 
     static size_t test_counter = 1;
 
-    Worker _w = create_worker();
-    Worker *w = &_w;
+    Worker _worker = create_worker();
+    Worker *worker = &_worker;
 
-    w->lexer.source = source;
+    worker->lexer.source = source;
 
-    AST* output = parse(w);
+    AST* output = parse(worker);
 
-    output = interp(w, output);
+    output = interp(worker, output);
 
     printf("test %02zu ... ", test_counter);
 
@@ -106,7 +106,7 @@ void test_ast(char *source, char *test_source) {
         printf("OK\n");
     }
 
-    arena_free(&w->arena);
+    arena_free(&worker->arena);
 
     test_counter += 1;
 }
@@ -132,7 +132,7 @@ void test() {
 
     // things from the sympy tutorial
     test_ast("sqrt(8)", "2*sqrt(2)");
-    // TEST_SOURCE_TO_INTERP("sqrt(8)", create_ast_binop(create_ast_integer(2), create_ast_func_call((Token){ .text="sqrt" }, create_ast_integer(2)), OP_MUL));
+    // TEST_SOURCE_TO_INTERP("sqrt(8)", _create_ast_binop(_create_ast_integer(2), create_ast_func_call((Token){ .text="sqrt" }, _create_ast_integer(2)), OP_MUL));
 
     // misc
     test_ast("sqrt(9)", "3");
@@ -242,8 +242,8 @@ int main(int argc, char *argv[]) {
     }
 
     if (do_cli) {
-        Worker _w = create_worker();
-        Worker *w = &_w;
+        Worker _worker = create_worker();
+        Worker *worker = &_worker;
 
         // ASTArray a = ast_to_flat_array(&w->arena, MUL(INTEGER(2), SYMBOL("x")));
         // for (size_t i = 0; i < a.size; i++) {
@@ -251,15 +251,15 @@ int main(int argc, char *argv[]) {
         // }
         
         // char *source = "sqrt(2)*sin(x^2)+3*abcd";
-        char *source = "sin(2)";
+        char *source = "cos(2)";
 
-        AST *output = interp_from_string(w, source);
+        AST *output = interp_from_string(worker, source);
         (void)output;
 
         // printf("%s\n", ast_to_string(output));
         printf("%s\n", ast_to_debug_string(output));
 
-        arena_free(&w->arena);
+        arena_free(&worker->arena);
     } else if (do_gui) {
         init_gui();
     } else {

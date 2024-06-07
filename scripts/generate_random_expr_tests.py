@@ -35,7 +35,7 @@ for _ in range(100):
         result = eval(expr)
         expr = expr.replace("**", "^")
         if abs(result) < 1e9 and result % int(result) == 0.0:
-            s = f"TEST_SOURCE_TO_INTERP(\"{expr}\", create_ast_integer({int(result)}));"
+            s = f"TEST_SOURCE_TO_INTERP(\"{expr}\", _create_ast_integer({int(result)}));"
             print(s)
     except (ZeroDivisionError, OverflowError):
         ...

@@ -91,13 +91,13 @@ void init_gui() {
                 cursor_position += 1;
             }
         } else if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_ENTER)) {
-            Worker _w = create_worker();
-            Worker *w = &_w;
+            Worker _worker = create_worker();
+            Worker *worker = &_worker;
 
-            AST* output = interp_from_string(w, cell_input_buffer);
+            AST* output = interp_from_string(worker, cell_input_buffer);
             cell_output_buffer = ast_to_string(output);
 
-            arena_free(&w->arena);
+            arena_free(&worker->arena);
         }
 
         //

@@ -21,7 +21,7 @@ AST *parse_exp(Worker* w) {
     switch (token.type) {
         case TOKEN_NUMBER:
             parser_eat(w, TOKEN_NUMBER);
-            return create_ast_integer(&w->arena, atoi(token.text));
+            return _create_ast_integer(&w->arena, atoi(token.text));
         case TOKEN_IDENTIFIER:
             if (is_builtin_function(token.text)) {
                 parser_eat(w, TOKEN_IDENTIFIER);
@@ -38,7 +38,7 @@ AST *parse_exp(Worker* w) {
                 return create_ast_func_call(&w->arena, token.text, args);
             } else {
                 parser_eat(w, TOKEN_IDENTIFIER);
-                return create_ast_symbol(&w->arena, token.text);
+                return _create_ast_symbol(&w->arena, token.text);
             }
         case TOKEN_L_PAREN:
             parser_eat(w, TOKEN_L_PAREN);
@@ -70,7 +70,7 @@ AST *parse_factor(Worker *w) {
         // parse_expr here. But unlike with addition and multiplication we want to parse pow operation
         // from right to left (this is more common, e.g. desmos, python, ...). 
         // For now I dont know if there are any edge cases, where this implementation is wrong.
-        result = create_ast_binop(&w->arena, result, parse_factor(w), OP_POW);
+        result = _create_ast_binop(&w->arena, result, parse_factor(w), OP_POW);
     }
 
     return result;
@@ -88,17 +88,17 @@ AST* parse_term(Worker* w) {
         switch (lexer_peek_token(&w->lexer).type) {
             case TOKEN_STAR:
                 parser_eat(w, TOKEN_STAR);
-                result = create_ast_binop(&w->arena, result, parse_factor(w), OP_MUL);
+                result = _create_ast_binop(&w->arena, result, parse_factor(w), OP_MUL);
                 break;
             case TOKEN_SLASH:
                 parser_eat(w, TOKEN_SLASH);
-                result = create_ast_binop(&w->arena, result, parse_factor(w), OP_DIV);
+                result = _create_ast_binop(&w->arena, result, parse_factor(w), OP_DIV);
                 break;
             case TOKEN_IDENTIFIER:
-                result = create_ast_binop(&w->arena, result, parse_factor(w), OP_MUL);
+                result = _create_ast_binop(&w->arena, result, parse_factor(w), OP_MUL);
                 break;
             case TOKEN_L_PAREN:
-                result = create_ast_binop(&w->arena, result, parse_exp(w), OP_MUL);
+                result = _create_ast_binop(&w->arena, result, parse_exp(w), OP_MUL);
                 break;
             default:
                 assert(false);
@@ -114,10 +114,10 @@ AST* parse_expr(Worker* w) {
     while (lexer_peek_token(&w->lexer).type == TOKEN_PLUS || lexer_peek_token(&w->lexer).type == TOKEN_MINUS) {
         if (lexer_peek_token(&w->lexer).type == TOKEN_PLUS) {
             parser_eat(w, TOKEN_PLUS);
-            result = create_ast_binop(&w->arena, result, parse_term(w), OP_ADD);
+            result = _create_ast_binop(&w->arena, result, parse_term(w), OP_ADD);
         } else if (lexer_peek_token(&w->lexer).type == TOKEN_MINUS) {
             parser_eat(w, TOKEN_MINUS);
-            result = create_ast_binop(&w->arena, result, parse_term(w), OP_SUB);
+            result = _create_ast_binop(&w->arena, result, parse_term(w), OP_SUB);
         }
     }
 

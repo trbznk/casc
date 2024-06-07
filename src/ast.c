@@ -34,6 +34,7 @@ const char* op_type_to_string(OpType type) {
 const char* ast_type_to_debug_string(ASTType type) {
     switch (type) {
         case AST_INTEGER: return "Integer";
+        case AST_REAL: return "Real";
         case AST_SYMBOL: return "Symbol";
         case AST_BINOP: return "BinOp";
         case AST_UNARYOP: return "UnaryOp";
@@ -72,14 +73,21 @@ void ast_array_append(ASTArray *array, AST *node) {
     array->size++;
 };
 
-AST* create_ast_integer(Arena* arena, int64_t value) {
+AST* _create_ast_integer(Arena* arena, int64_t value) {
     AST* node = arena_alloc(arena, sizeof(AST));
     node->type = AST_INTEGER;
     node->integer.value = value;
     return node;
 }
 
-AST* create_ast_symbol(Arena* arena, char *name) {
+AST* _create_ast_real(Arena* arena, f64 value) {
+    AST* node = arena_alloc(arena, sizeof(AST));
+    node->type = AST_REAL;
+    node->real.value = value;
+    return node;
+}
+
+AST* _create_ast_symbol(Arena* arena, char *name) {
     AST *node = arena_alloc(arena, sizeof(AST));
     node->type = AST_SYMBOL;
     node->symbol.name = arena_alloc(arena, strlen(name)+1);
@@ -88,7 +96,7 @@ AST* create_ast_symbol(Arena* arena, char *name) {
     return node;
 }
 
-AST* create_ast_binop(Arena* arena, AST* left, AST* right, OpType type) {
+AST* _create_ast_binop(Arena* arena, AST* left, AST* right, OpType type) {
     AST *node = arena_alloc(arena, sizeof(AST));
     node->type = AST_BINOP;
     node->binop.left = left;
