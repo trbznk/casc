@@ -38,7 +38,7 @@ const char* ast_type_to_debug_string(ASTType type) {
         case AST_SYMBOL: return "Symbol";
         case AST_BINOP: return "BinOp";
         case AST_UNARYOP: return "UnaryOp";
-        case AST_FUNC_CALL: return "FuncCall";
+        case AST_CALL: return "FuncCall";
         case AST_EMPTY: return "Empty";
         case AST_TYPE_COUNT: assert(false);
     }
@@ -62,13 +62,8 @@ uint8_t op_type_precedence(OpType type) {
     }
 }
 
-void ast_array_append(ASTArray *array, AST *node) {
-    // TODO: we need to change this to arena allocator
-    if (array->size == 0) {
-        array->data = malloc(sizeof(AST));
-    } else {
-        array->data = realloc(array->data, (array->size+1)*sizeof(AST));
-    }
+void ast_array_append(Arena *arena, ASTArray *array, AST *node) {
+    array->data = arena_alloc(arena, sizeof(AST));
     array->data[array->size] = node;
     array->size++;
 };
@@ -113,9 +108,9 @@ AST* create_ast_unaryop(Arena* arena, AST* expr, OpType type) {
     return node;
 }
 
-AST* create_ast_func_call(Arena* arena, char *name, ASTArray args) {
+AST* create_ast_call(Arena* arena, char *name, ASTArray args) {
     AST *node = arena_alloc(arena, sizeof(AST));
-    node->type = AST_FUNC_CALL;
+    node->type = AST_CALL;
     strcpy(node->func_call.name, name);
     node->func_call.args = args;
     return node;
@@ -129,23 +124,20 @@ AST* create_ast_empty(Arena* arena) {
 }
 
 void _ast_to_flat_array(Arena* arena, AST* ast, ASTArray* array) {
-    (void)arena;
-    (void)ast;
-    (void)array;
 
     switch (ast->type) {
         case AST_INTEGER:
         case AST_SYMBOL:
-            ast_array_append(array, ast);
+            ast_array_append(arena, array, ast);
             break;
         case AST_BINOP:
-            ast_array_append(array, ast);
+            ast_array_append(arena, array, ast);
             _ast_to_flat_array(arena, ast->binop.left, array);
             _ast_to_flat_array(arena, ast->binop.right, array);
             break;
-        case AST_FUNC_CALL:
-            ast_array_append(array, ast);
-            for (size_t i = 0; i < ast->func_call.args.size; i++) {
+        case AST_CALL:
+            ast_array_append(arena, array, ast);
+            for (usize i = 0; i < ast->func_call.args.size; i++) {
                 _ast_to_flat_array(arena, ast->func_call.args.data[i], array);
             }
             break;
@@ -153,6 +145,7 @@ void _ast_to_flat_array(Arena* arena, AST* ast, ASTArray* array) {
             printf("type %s not implemented\n", ast_type_to_debug_string(ast->type));
             assert(false);
     }
+
 }
 
 ASTArray ast_to_flat_array(Arena* arena, AST* ast) {

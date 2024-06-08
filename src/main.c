@@ -10,7 +10,7 @@
 
 #define ARENA_SIZE 1024
 
-Arena create_arena(size_t size) {
+Arena create_arena(usize size) {
     Arena arena = {0};
     arena.memory = malloc(size);
     arena.size = size;
@@ -28,15 +28,19 @@ void arena_free(Arena *arena) {
     arena->offset = 0;
 }
 
-void *arena_alloc(Arena *arena, size_t size) {
-    size_t free_capacity = arena->size - arena->offset;
+void arena_reset(Arena *arena) {
+    arena->offset = 0;
+}
 
-#if 0
+void *arena_alloc(Arena *arena, usize size) {
+    usize free_capacity = arena->size - arena->offset;
+
+#if 1
     printf("size=%zu, free_capacity=%zu, reallocs_count=%u\n", size, free_capacity, arena->reallocs_count);
 #endif
 
     if (free_capacity <= size) {
-        size_t new_size;
+        usize new_size;
 
         if (size < ARENA_SIZE) {
             new_size = arena->size + ARENA_SIZE;
@@ -54,7 +58,7 @@ void *arena_alloc(Arena *arena, size_t size) {
     void *memory = arena->memory + arena->offset;
 
     // compute the new position in the memory
-    arena->offset = arena->offset + size;
+    arena->offset += size;
 
     // double arena_memory_used = (double)arena->offset / (double)arena->size;
     // assert(arena_memory_used < 0.5);
@@ -76,20 +80,19 @@ Worker create_worker() {
 
 void test_ast(char *source, char *test_source) {
 
-    static size_t test_counter = 1;
+    static usize test_counter = 1;
 
-    Worker _worker = create_worker();
-    Worker *worker = &_worker;
+    Worker worker = create_worker();
 
-    worker->lexer.source = source;
+    worker.lexer.source = source;
 
-    AST* output = parse(worker);
+    AST* output = parse(&worker);
 
-    output = interp(worker, output);
+    output = interp(&worker, output);
 
     printf("test %02zu ... ", test_counter);
 
-    char *output_string = ast_to_string(output);
+    char *output_string = ast_to_string(&worker.arena, output);
     
     if (strcmp(output_string, test_source) != 0) {
         printf("FAILED\n");
@@ -106,7 +109,7 @@ void test_ast(char *source, char *test_source) {
         printf("OK\n");
     }
 
-    arena_free(&worker->arena);
+    arena_free(&worker.arena);
 
     test_counter += 1;
 }
@@ -132,7 +135,7 @@ void test() {
 
     // things from the sympy tutorial
     test_ast("sqrt(8)", "2*sqrt(2)");
-    // TEST_SOURCE_TO_INTERP("sqrt(8)", _create_ast_binop(_create_ast_integer(2), create_ast_func_call((Token){ .text="sqrt" }, _create_ast_integer(2)), OP_MUL));
+    // TEST_SOURCE_TO_INTERP("sqrt(8)", _create_ast_binop(_create_ast_integer(2), create_ast_call((Token){ .text="sqrt" }, _create_ast_integer(2)), OP_MUL));
 
     // misc
     test_ast("sqrt(9)", "3");
@@ -242,24 +245,21 @@ int main(int argc, char *argv[]) {
     }
 
     if (do_cli) {
-        Worker _worker = create_worker();
-        Worker *worker = &_worker;
+        Worker worker = create_worker();
 
-        // ASTArray a = ast_to_flat_array(&w->arena, MUL(INTEGER(2), SYMBOL("x")));
-        // for (size_t i = 0; i < a.size; i++) {
-        //     printf("[%zu] %s\n", i, ast_to_debug_string(a.data[i]));
-        // }
+        char *source = "1.2*4";
+
+        AST *ast = parse_from_string(&worker, source);
+        // AST *output = interp_from_string(&worker, source);
         
-        // char *source = "sqrt(2)*sin(x^2)+3*abcd";
-        char *source = "cos(2)";
+        // print_tokens_from_string(source);
+        // printf("%s\n", ast_to_debug_string(&worker.arena, ast));
+        assert(ast->binop.left->real.value == 1.2);
+        printf("%s\n", ast_to_string(&worker.arena, ast));
+        printf("%u\n", worker.arena.reallocs_count);
+        // printf("%s\n", ast_to_debug_string(&worker.arena, output));
 
-        AST *output = interp_from_string(worker, source);
-        (void)output;
-
-        // printf("%s\n", ast_to_string(output));
-        printf("%s\n", ast_to_debug_string(output));
-
-        arena_free(&worker->arena);
+        arena_free(&worker.arena);
     } else if (do_gui) {
         init_gui();
     } else {

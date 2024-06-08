@@ -22,9 +22,11 @@ void init_gui() {
     int screen_height = 600;
     int cursor_position = 0;
 
+    Arena gui_arena = create_arena(1024);
+
     char cell_input_buffer[CELL_INPUT_BUFFER_SIZE];
 
-    // TODO: dont like this
+    // dont like this @todo
     char *cell_output_buffer = NULL;
     cell_input_buffer[0] = '\0';
 
@@ -41,6 +43,14 @@ void init_gui() {
 
     bool last_char_is_caret = false;
     while (!WindowShouldClose()) {
+
+        //
+        // DEBUG
+        //
+
+#if 0
+        printf("cursor_position=%d\n", cursor_position);
+#endif
 
         //
         // Control
@@ -91,13 +101,13 @@ void init_gui() {
                 cursor_position += 1;
             }
         } else if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_ENTER)) {
-            Worker _worker = create_worker();
-            Worker *worker = &_worker;
+            Worker worker = create_worker();
 
-            AST* output = interp_from_string(worker, cell_input_buffer);
-            cell_output_buffer = ast_to_string(output);
+            AST* output = interp_from_string(&worker, cell_input_buffer);
 
-            arena_free(&worker->arena);
+            cell_output_buffer = ast_to_string(&gui_arena, output);
+
+            arena_free(&worker.arena);
         }
 
         //

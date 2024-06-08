@@ -22,12 +22,12 @@ bool ast_match(AST* left, AST* right) {
                 return !strcmp(left->symbol.name, right->symbol.name);
             case AST_BINOP:
                 return ast_match(left->binop.left, right->binop.left) && ast_match(left->binop.right, right->binop.right);
-            case AST_FUNC_CALL: {
+            case AST_CALL: {
                 if (
                     !strcmp(left->func_call.name, right->func_call.name) &&
                     left->func_call.args.size == right->func_call.args.size
                 ) {
-                    for (size_t i = 0; i < left->func_call.args.size; i++) {
+                    for (usize i = 0; i < left->func_call.args.size; i++) {
                         if (!ast_match(left->func_call.args.data[i], right->func_call.args.data[i])) {
                             return false;
                         }
@@ -60,27 +60,30 @@ bool ast_match_type(AST *left, AST *right) {
             }
             return false;
         }
-        default: printf("ERROR: In ast_match_type, node type %s not implemented.\n", ast_type_to_debug_string(left->type)); break;
+        default: {
+            printf("ERROR: In ast_match_type, node type %s not implemented.\n", ast_type_to_debug_string(left->type));
+            exit(1);
+            break;
+        }
     }
 
     return false;
 }
 
-char *ast_to_debug_string(AST* node) {
-    // TODO: memory management needed here
-    char *output = malloc(1024);
+char *ast_to_debug_string(Arena *arena, AST* node) {
+    char *output = arena_alloc(arena, 1024);
     switch (node->type) {
         case AST_INTEGER: sprintf(output, "%s(%lld)", ast_type_to_debug_string(node->type), node->integer.value); break;
         case AST_REAL: sprintf(output, "%s(%f)", ast_type_to_debug_string(node->type), node->real.value); break;
         case AST_SYMBOL: sprintf(output, "%s(%s)", ast_type_to_debug_string(node->type), node->symbol.name); break;
-        case AST_BINOP: sprintf(output, "%s(%s, %s)", op_type_to_debug_string(node->binop.type), ast_to_debug_string(node->binop.left), ast_to_debug_string(node->binop.right)); break;
-        case AST_UNARYOP: sprintf(output, "%s(%s)", op_type_to_debug_string(node->unaryop.type), ast_to_debug_string(node->unaryop.expr)); break;
-        // TODO: args to debug string
-        case AST_FUNC_CALL: {
+        case AST_BINOP: sprintf(output, "%s(%s, %s)", op_type_to_debug_string(node->binop.type), ast_to_debug_string(arena, node->binop.left), ast_to_debug_string(arena, node->binop.right)); break;
+        case AST_UNARYOP: sprintf(output, "%s(%s)", op_type_to_debug_string(node->unaryop.type), ast_to_debug_string(arena, node->unaryop.expr)); break;
+        // args to debug string @todo
+        case AST_CALL: {
             if (node->func_call.args.size == 1) {
-                sprintf(output, "FuncCall(%s, %s)", node->func_call.name, ast_to_debug_string(node->func_call.args.data[0])); break;
+                sprintf(output, "FuncCall(%s, %s)", node->func_call.name, ast_to_debug_string(arena, node->func_call.args.data[0])); break;
             } else {
-                // TODO: multiple args to string
+                // multiple args to string @todo
                 sprintf(output, "FuncCall(%s, args)", node->func_call.name); break;
             }
         }
@@ -91,10 +94,10 @@ char *ast_to_debug_string(AST* node) {
 }
 
 char *_ast_to_string(Arena *arena, AST* node, uint8_t op_precedence) {
-    // TODO: parse arena here for the malloc
     char *output = arena_alloc(arena, 1024);
     switch (node->type) {
         case AST_INTEGER: sprintf(output, "%lld", node->integer.value); break;
+        case AST_REAL: sprintf(output, "%f", node->real.value); break;
         case AST_SYMBOL:
             sprintf(output, "%s", node->symbol.name); break;
         case AST_BINOP: {
@@ -126,11 +129,11 @@ char *_ast_to_string(Arena *arena, AST* node, uint8_t op_precedence) {
             }
             
         }
-        case AST_FUNC_CALL: {
+        case AST_CALL: {
             if (node->func_call.args.size == 1) {
                 sprintf(output, "%s(%s)", node->func_call.name, _ast_to_string(arena, node->func_call.args.data[0], op_precedence)); break;
             } else {
-                // TODO: multiple args to string
+                // multiple args to string @todo
                 sprintf(output, "%s(args)", node->func_call.name); break;
             }
         }
@@ -214,8 +217,11 @@ AST* interp_binop_sub(Worker *worker, AST* node) {
 AST* interp_binop_mul(Worker *worker, AST* node) {
     AST* left = interp(worker, node->binop.left);
     AST* right = interp(worker, node->binop.right);
+
     if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
         return _create_ast_integer(&worker->arena, left->integer.value * right->integer.value);
+    } else if ((left->type == AST_INTEGER && right->type == AST_REAL) || (left->type == AST_REAL && right->type == AST_INTEGER)) {
+        todo()
     } else if (ast_match(left, _create_ast_integer(&worker->arena, 0)) || ast_match(_create_ast_integer(&worker->arena, 0), right)) {
         return _create_ast_integer(&worker->arena, 0);
     } else if (ast_match(left, right)) {
@@ -370,11 +376,11 @@ AST *interp_cos(Worker *worker, AST* node) {
 }
 
 AST* interp_func_call(Worker *worker, AST* node) {
-    // TODO: we need a proper system for checking and using args (function definitions and function signatures)
+    // we need a proper system for checking and using args (function definitions and function signatures) @ƒeature
 
     char *func_name = node->func_call.name;
 
-    for (size_t i = 0; i < node->func_call.args.size; i++) {
+    for (usize i = 0; i < node->func_call.args.size; i++) {
         node->func_call.args.data[i] = interp(worker, node->func_call.args.data[i]);
     }
 
@@ -395,8 +401,8 @@ AST* interp_func_call(Worker *worker, AST* node) {
             if (is_perfect_square && args.data[0]->integer.value % q == 0) {
                 int p = args.data[0]->integer.value / q;
                 ASTArray new_args = {0};
-                ast_array_append(&new_args, _create_ast_integer(&worker->arena, p));
-                return _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, (int64_t)sqrt_of_q), create_ast_func_call(&worker->arena, func_name, new_args), OP_MUL);
+                ast_array_append(&worker->arena, &new_args, _create_ast_integer(&worker->arena, p));
+                return _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, (int64_t)sqrt_of_q), create_ast_call(&worker->arena, func_name, new_args), OP_MUL);
             }
         }
     } else if (!strcmp(func_name, "ln")) {
@@ -430,7 +436,7 @@ AST* interp_func_call(Worker *worker, AST* node) {
             ASTArray nodes = ast_to_flat_array(&worker->arena, node);
             bool symbol_seen = false;
             AST *symbol;
-            for (size_t i = 0; i < nodes.size; i++) {
+            for (usize i = 0; i < nodes.size; i++) {
                 if (nodes.data[i]->type == AST_SYMBOL) {
                     if (symbol_seen) {
                         assert(ast_match(symbol, nodes.data[i]));
@@ -464,7 +470,7 @@ AST* interp(Worker *worker, AST* node) {
         case AST_INTEGER:
         case AST_SYMBOL:
             return node;
-        case AST_FUNC_CALL:
+        case AST_CALL:
             return interp_func_call(worker, node);
         case AST_EMPTY:
             return node;

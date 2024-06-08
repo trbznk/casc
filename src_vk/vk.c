@@ -493,7 +493,7 @@ VkPresentModeKHR vk_choose_swap_present_mode(const VkPresentModeKHR *available_p
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-// TODO: move this into casc core.c
+// move this into casc core.c @move
 uint32_t clamp(uint32_t v, uint32_t low, uint32_t high) {
     if (low <= v && v <= high) {
         return v;
@@ -736,7 +736,7 @@ void vk_create_image_views(VkContext* context) {
 
 }
 
-// TODO: move this function into core.c
+// @move this function into core.c
 ShaderCode vk_read_shader_code_file(const char* path) {
     printf("read shader code %s\n", path);
     ShaderCode code;
