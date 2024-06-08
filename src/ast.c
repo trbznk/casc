@@ -44,7 +44,7 @@ const char* ast_type_to_debug_string(ASTType type) {
     }
 }
 
-uint8_t op_type_precedence(OpType type) {
+u8 op_type_precedence(OpType type) {
     switch (type) {
         case OP_POW:
             return 4;
@@ -68,7 +68,7 @@ void ast_array_append(Arena *arena, ASTArray *array, AST *node) {
     array->size++;
 };
 
-AST* _create_ast_integer(Arena* arena, int64_t value) {
+AST* _create_ast_integer(Arena* arena, i64 value) {
     AST* node = arena_alloc(arena, sizeof(AST));
     node->type = AST_INTEGER;
     node->integer.value = value;
@@ -170,3 +170,21 @@ bool ast_contains(AST *node, AST *target) {
         }
     }
 };
+
+f64 ast_to_f64(AST *node) {
+    switch (node->type) {
+        case AST_INTEGER: return (f64) node->integer.value;
+        case AST_REAL:    return node->real.value;
+        default:          panic("not allowed");
+    }
+}
+
+bool ast_is_numeric(AST* node) {
+    switch (node->type) {
+        case AST_INTEGER:
+        case AST_REAL:
+            return true;
+        default:
+            return false;
+    }
+}

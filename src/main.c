@@ -35,7 +35,7 @@ void arena_reset(Arena *arena) {
 void *arena_alloc(Arena *arena, usize size) {
     usize free_capacity = arena->size - arena->offset;
 
-#if 1
+#if 0
     printf("size=%zu, free_capacity=%zu, reallocs_count=%u\n", size, free_capacity, arena->reallocs_count);
 #endif
 
@@ -50,7 +50,7 @@ void *arena_alloc(Arena *arena, usize size) {
         }
 
         arena->size = new_size ;
-        arena->memory = realloc(arena->memory, new_size);
+        arena->memory = realloc(arena->memory, arena->size);
         arena->reallocs_count += 1;
     }
 
@@ -79,21 +79,17 @@ Worker create_worker() {
 }
 
 void test_ast(char *source, char *test_source) {
-
     static usize test_counter = 1;
 
     Worker worker = create_worker();
-
     worker.lexer.source = source;
 
     AST* output = parse(&worker);
-
     output = interp(&worker, output);
 
     printf("test %02zu ... ", test_counter);
 
     char *output_string = ast_to_string(&worker.arena, output);
-    
     if (strcmp(output_string, test_source) != 0) {
         printf("FAILED\n");
 
@@ -222,12 +218,12 @@ void test() {
     printf("\n\n");
 }
 
-int main(int argc, char *argv[]) {
+i32 main(i32 argc, char *argv[]) {
     bool do_test = false;
     bool do_cli = true;
     bool do_gui = false;
 
-    for (int i = 1; i < argc; i++) {
+    for (i32 i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "--test")) {
             do_test = true;
         } else if (!strcmp(argv[i], "--gui")) {

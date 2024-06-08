@@ -86,13 +86,21 @@ bool is_builtin_constant(char*);
 //
 
 #define create_ast_integer(value) _create_ast_integer(&worker->arena, value)
+#define INTEGER(value) _create_ast_integer(&worker->arena, value)
 #define create_ast_real(value) _create_ast_real(&worker->arena, value)
+#define REAL(value) _create_ast_real(&worker->arena, value)
 #define create_ast_symbol(name) _create_ast_symbol(&worker->arena, name)
+#define SYMBOL(name) _create_ast_symbol(&worker->arena, name)
 #define create_ast_add(left, right) _create_ast_binop(&worker->arena, left, right, OP_ADD)
+#define ADD(left, right) _create_ast_binop(&worker->arena, left, right, OP_ADD)
 #define create_ast_sub(left, right) _create_ast_binop(&worker->arena, left, right, OP_SUB)
+#define SUB(left, right) _create_ast_binop(&worker->arena, left, right, OP_SUB)
 #define create_ast_mul(left, right) _create_ast_binop(&worker->arena, left, right, OP_MUL)
+#define MUL(left, right) _create_ast_binop(&worker->arena, left, right, OP_MUL)
 #define create_ast_div(left, right) _create_ast_binop(&worker->arena, left, right, OP_DIV)
+#define DIV(left, right) _create_ast_binop(&worker->arena, left, right, OP_DIV)
 #define create_ast_pow(left, right) _create_ast_binop(&worker->arena, left, right, OP_POW)
+#define POW(left, right) _create_ast_binop(&worker->arena, left, right, OP_POW)
 
 typedef struct ASTArray ASTArray;
 
@@ -183,6 +191,10 @@ uint8_t op_type_precedence(OpType);
 
 ASTArray ast_to_flat_array(Arena*, AST*);
 bool ast_contains(AST*, AST*);
+bool ast_is_numeric(AST*);
+
+f64 ast_to_f64(AST*);
+
 
 //
 // parser
@@ -220,7 +232,8 @@ void init_gui();
 // general
 //
 
-#define todo() printf("%s:%d: not implemented\n", __FILE__, __LINE__); exit(1);
+#define panic(msg) fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, msg); exit(1);
+#define todo() panic("not implemented");
 
 struct Arena {
     void *memory;

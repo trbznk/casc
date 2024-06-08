@@ -18,9 +18,9 @@ const Color COLOR_CHESTNUT = {162, 73, 54, 255};
 
 void init_gui() {
     char* window_title = "casc";
-    int screen_width = 800;
-    int screen_height = 600;
-    int cursor_position = 0;
+    i32 screen_width = 800;
+    i32 screen_height = 600;
+    i32 cursor_position = 0;
 
     Arena gui_arena = create_arena(1024);
 
@@ -84,7 +84,7 @@ void init_gui() {
             cursor_position++;
         } else if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) {
             if (cursor_position > 0) {
-                int idx_to_delete = cursor_position-1;
+                i32 idx_to_delete = cursor_position-1;
                 memmove(
                     &cell_input_buffer[idx_to_delete],
                     &cell_input_buffer[idx_to_delete+1],
@@ -114,32 +114,34 @@ void init_gui() {
         // Draw
         //
         BeginDrawing();
-            ClearBackground(WHITE);
+
+        ClearBackground(WHITE);
 
 #if 0
-            {
-                Color c = { 0xFF, 0x00, 0x00, 0xFF};
-                DrawRectangleLines(0, 0, screen_width, screen_height, c); 
-                DrawRectangleLines(0, 0, screen_width, line_height, c); 
-                DrawRectangleLines(0, line_height, screen_width, line_height, c); 
-            }
+        {
+            Color c = { 0xFF, 0x00, 0x00, 0xFF};
+            DrawRectangleLines(0, 0, screen_width, screen_height, c); 
+            DrawRectangleLines(0, 0, screen_width, line_height, c); 
+            DrawRectangleLines(0, line_height, screen_width, line_height, c); 
+        }
 #endif
 
-            Vector2 input_text_pos = { padding.x, padding.y, };
-            DrawTextEx(font, cell_input_buffer, input_text_pos, font_size.y, 0, COLOR_DARK_GREEN);
+        Vector2 input_text_pos = { padding.x, padding.y, };
+        DrawTextEx(font, cell_input_buffer, input_text_pos, font_size.y, 0, COLOR_DARK_GREEN);
 
-            {
-                int x = padding.x + font_size.x * cursor_position;
-                int y = padding.y;
-                DrawRectangle(x, y, font_size.x/8, font_size.y, COLOR_POMP_AND_POWER);
-            }
+        {
+            i32 x = padding.x + font_size.x * cursor_position;
+            i32 y = padding.y;
+            DrawRectangle(x, y, font_size.x/8, font_size.y, COLOR_POMP_AND_POWER);
+        }
 
-            DrawLine(0, line_height, screen_width, line_height, COLOR_MOONSTONE);
+        DrawLine(0, line_height, screen_width, line_height, COLOR_MOONSTONE);
 
-            if (cell_output_buffer != NULL) {
-                Vector2 output_text_pos = { padding.x, line_height + padding.y, };
-                DrawTextEx(font, cell_output_buffer, output_text_pos, font_size.y, 2, COLOR_DARK_GREEN);
-            }
+        if (cell_output_buffer != NULL) {
+            Vector2 output_text_pos = { padding.x, line_height + padding.y, };
+            DrawTextEx(font, cell_output_buffer, output_text_pos, font_size.y, 2, COLOR_DARK_GREEN);
+        }
+
         EndDrawing();
     }
 

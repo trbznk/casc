@@ -11,7 +11,6 @@
 AST *interp_binop_div(Worker*, AST*);
 AST *interp_binop(Worker*, AST*);
 
-
 bool ast_match(AST* left, AST* right) {
 
     if (left->type == right->type) {
@@ -147,8 +146,8 @@ AST* interp_binop_add(Worker *worker, AST* node) {
     AST* left = interp(worker, node->binop.left);
     AST* right = interp(worker, node->binop.right);
 
-    if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
-        return _create_ast_integer(&worker->arena, left->integer.value + right->integer.value);
+    if (ast_is_numeric(left) && ast_is_numeric(right)) {
+        return interp(worker, REAL(ast_to_f64(left)+ast_to_f64(right)));
     } else if (ast_match(left, create_ast_integer(0))) {
         return right;
     } else if (ast_match(right, create_ast_integer(0))) {
@@ -157,10 +156,10 @@ AST* interp_binop_add(Worker *worker, AST* node) {
         return _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, 2), left, OP_MUL);
     } else if (ast_match_type(left, _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, 1), _create_ast_integer(&worker->arena, 1), OP_DIV)) && ast_match_type(right, _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, 1), _create_ast_integer(&worker->arena, 1), OP_DIV))) {
         // a/b + c/d
-        int64_t a = left->binop.left->integer.value;
-        int64_t b = left->binop.right->integer.value;
-        int64_t c = right->binop.left->integer.value;
-        int64_t d = right->binop.right->integer.value;
+        i64 a = left->binop.left->integer.value;
+        i64 b = left->binop.right->integer.value;
+        i64 c = right->binop.left->integer.value;
+        i64 d = right->binop.right->integer.value;
         AST* r = _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, a*d+c*b), _create_ast_integer(&worker->arena, b*d), OP_DIV);
         return interp_binop_div(worker, r);
     } else if (left->type == AST_INTEGER && right->type == AST_BINOP && right->binop.type == OP_DIV) {
@@ -181,8 +180,8 @@ AST* interp_binop_sub(Worker *worker, AST* node) {
     AST* left = interp(worker, node->binop.left);
     AST* right = interp(worker, node->binop.right);
 
-    if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
-        return _create_ast_integer(&worker->arena, left->integer.value - right->integer.value);
+    if (ast_is_numeric(left) && ast_is_numeric(right)) {
+        return interp(worker, REAL(ast_to_f64(left)-ast_to_f64(right)));
     } else if (ast_match_type(left, create_ast_integer(1)) && ast_match_type(right, create_ast_div(create_ast_integer(1), create_ast_integer(1)))) {
         // a - b/c -> ac/c - b/c = (ac-b)/c
         AST* a = left;
@@ -218,10 +217,8 @@ AST* interp_binop_mul(Worker *worker, AST* node) {
     AST* left = interp(worker, node->binop.left);
     AST* right = interp(worker, node->binop.right);
 
-    if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
-        return _create_ast_integer(&worker->arena, left->integer.value * right->integer.value);
-    } else if ((left->type == AST_INTEGER && right->type == AST_REAL) || (left->type == AST_REAL && right->type == AST_INTEGER)) {
-        todo()
+    if (ast_is_numeric(left) && ast_is_numeric(right)) {
+        return interp(worker, REAL(ast_to_f64(left)*ast_to_f64(right)));
     } else if (ast_match(left, _create_ast_integer(&worker->arena, 0)) || ast_match(_create_ast_integer(&worker->arena, 0), right)) {
         return _create_ast_integer(&worker->arena, 0);
     } else if (ast_match(left, right)) {
@@ -254,6 +251,10 @@ AST* interp_binop_div(Worker *worker, AST* node) {
         } else {
             return _create_ast_binop(&worker->arena, left, right, OP_DIV);
         }
+    } else if (ast_is_numeric(left) && ast_is_numeric(right)) {
+        f64 l = ast_to_f64(left);
+        f64 r = ast_to_f64(right);
+        return interp(worker, create_ast_real(l/r));
     } else if (left->type == AST_INTEGER && right->type == AST_BINOP && right->binop.type == OP_DIV) {
         AST* r = _create_ast_binop(&worker->arena, _create_ast_binop(&worker->arena, left, right->binop.left, OP_MUL), right->binop.right, OP_DIV);
         return interp_binop(worker, r);
@@ -351,8 +352,9 @@ AST *interp_sin(Worker *worker, AST* node) {
 
     if (ast_match(arg, create_ast_symbol("pi"))) {
         return create_ast_integer(0);
-    } else if (arg->type == AST_INTEGER) {
-        return create_ast_real(sinf(arg->integer.value));
+    } else if (arg->type == AST_INTEGER || arg->type == AST_REAL) {
+        f64 value = ast_to_f64(arg);
+        return interp(worker, create_ast_real(sin(value)));
     }
     
     return node;
@@ -368,8 +370,9 @@ AST *interp_cos(Worker *worker, AST* node) {
         return create_ast_integer(0);
     } else if (ast_match(arg, create_ast_symbol("pi"))) {
         return create_ast_integer(-1);
-    } else if (arg->type == AST_INTEGER) {
-        return create_ast_real(cosf(arg->integer.value));
+    } else if (arg->type == AST_INTEGER || arg->type == AST_REAL) {
+        f64 value = ast_to_f64(arg);
+        return interp(worker, create_ast_real(cos(value)));
     }
 
     return node;
@@ -395,14 +398,14 @@ AST* interp_func_call(Worker *worker, AST* node) {
 
         // check for perfect square
         // @Speed: this is probably an inefficient way to compute the biggest perfect sqaure factor of a given number
-        for (int q = args.data[0]->integer.value; q > 1; q--) {
+        for (i32 q = args.data[0]->integer.value; q > 1; q--) {
             double sqrt_of_q = sqrtf((double)q);
             bool is_perfect_square = sqrt_of_q == floor(sqrt_of_q);
             if (is_perfect_square && args.data[0]->integer.value % q == 0) {
-                int p = args.data[0]->integer.value / q;
+                i32 p = args.data[0]->integer.value / q;
                 ASTArray new_args = {0};
                 ast_array_append(&worker->arena, &new_args, _create_ast_integer(&worker->arena, p));
-                return _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, (int64_t)sqrt_of_q), create_ast_call(&worker->arena, func_name, new_args), OP_MUL);
+                return _create_ast_binop(&worker->arena, _create_ast_integer(&worker->arena, (i64)sqrt_of_q), create_ast_call(&worker->arena, func_name, new_args), OP_MUL);
             }
         }
     } else if (!strcmp(func_name, "ln")) {
@@ -470,12 +473,19 @@ AST* interp(Worker *worker, AST* node) {
         case AST_INTEGER:
         case AST_SYMBOL:
             return node;
+        case AST_REAL: {
+            f64 value = node->real.value;
+            if (value - floor(value) == 0.0) {
+                return create_ast_integer((i64)value);
+            }
+            return node;
+        }
         case AST_CALL:
             return interp_func_call(worker, node);
         case AST_EMPTY:
             return node;
         default:
-            fprintf(stderr, "ERROR: Cannot interp node type '%s'\n", ast_type_to_debug_string(node->type));
+            fprintf(stderr, "%s:%d: Cannot interp node type '%s'\n", __FILE__, __LINE__, ast_type_to_debug_string(node->type));
             exit(1);
     }
 }
