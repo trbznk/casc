@@ -68,21 +68,21 @@ void ast_array_append(Arena *arena, ASTArray *array, AST *node) {
     array->size++;
 };
 
-AST* _create_ast_integer(Arena* arena, i64 value) {
+AST* init_ast_integer(Arena* arena, i64 value) {
     AST* node = arena_alloc(arena, sizeof(AST));
     node->type = AST_INTEGER;
     node->integer.value = value;
     return node;
 }
 
-AST* _create_ast_real(Arena* arena, f64 value) {
+AST* init_ast_real(Arena* arena, f64 value) {
     AST* node = arena_alloc(arena, sizeof(AST));
     node->type = AST_REAL;
     node->real.value = value;
     return node;
 }
 
-AST* _create_ast_symbol(Arena* arena, char *name) {
+AST* init_ast_symbol(Arena* arena, char *name) {
     AST *node = arena_alloc(arena, sizeof(AST));
     node->type = AST_SYMBOL;
     node->symbol.name = arena_alloc(arena, strlen(name)+1);
@@ -91,7 +91,7 @@ AST* _create_ast_symbol(Arena* arena, char *name) {
     return node;
 }
 
-AST* _create_ast_binop(Arena* arena, AST* left, AST* right, OpType type) {
+AST* init_ast_binop(Arena* arena, AST* left, AST* right, OpType type) {
     AST *node = arena_alloc(arena, sizeof(AST));
     node->type = AST_BINOP;
     node->binop.left = left;
@@ -100,7 +100,7 @@ AST* _create_ast_binop(Arena* arena, AST* left, AST* right, OpType type) {
     return node;
 }
 
-AST* create_ast_unaryop(Arena* arena, AST* expr, OpType type) {
+AST* init_ast_unaryop(Arena* arena, AST* expr, OpType type) {
     AST* node = arena_alloc(arena, sizeof(AST));
     node->type = AST_UNARYOP;
     node->unaryop.expr = expr;
@@ -108,7 +108,7 @@ AST* create_ast_unaryop(Arena* arena, AST* expr, OpType type) {
     return node;
 }
 
-AST* create_ast_call(Arena* arena, char *name, ASTArray args) {
+AST* init_ast_call(Arena* arena, char *name, ASTArray args) {
     AST *node = arena_alloc(arena, sizeof(AST));
     node->type = AST_CALL;
     strcpy(node->func_call.name, name);
@@ -116,7 +116,7 @@ AST* create_ast_call(Arena* arena, char *name, ASTArray args) {
     return node;
 }
 
-AST* create_ast_empty(Arena* arena) {
+AST* init_ast_empty(Arena* arena) {
     AST* node = arena_alloc(arena, sizeof(AST));
     node->type = AST_EMPTY;
     node->empty = true;

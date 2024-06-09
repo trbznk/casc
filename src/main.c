@@ -10,10 +10,13 @@
 
 #define ARENA_SIZE 1024
 
-Arena create_arena(usize size) {
+Arena init_arena() {
     Arena arena = {0};
-    arena.memory = malloc(size);
-    arena.size = size;
+    arena.memory = malloc(ARENA_SIZE);
+    if (arena.memory == NULL) {
+        todo()
+    }
+    arena.size = ARENA_SIZE;
     return arena;
 }
 
@@ -28,6 +31,7 @@ void arena_free(Arena *arena) {
     arena->offset = 0;
 }
 
+// maybe @unused
 void arena_reset(Arena *arena) {
     arena->offset = 0;
 }
@@ -51,6 +55,9 @@ void *arena_alloc(Arena *arena, usize size) {
 
         arena->size = new_size ;
         arena->memory = realloc(arena->memory, arena->size);
+        if (arena->memory == NULL) {
+            todo()
+        }
         arena->reallocs_count += 1;
     }
 
@@ -71,32 +78,25 @@ void *arena_alloc(Arena *arena, usize size) {
     return memory;
 }
 
-Worker create_worker() {
-    Worker w;
-    w.arena = create_arena(ARENA_SIZE);
-    w.lexer.pos = 0;
-    return w;
-}
-
 void test_ast(char *source, char *test_source) {
     static usize test_counter = 1;
 
-    Worker worker = create_worker();
-    worker.lexer.source = source;
+    Arena arena = init_arena();
 
-    AST* output = parse(&worker);
-    output = interp(&worker, output);
+    Lexer lexer = {0};
+    lexer.source = source;
+
+    Interp ip = {0};
+    ip.arena = &arena;
+
+    AST* output = parse(&lexer);
+    output = interp(&ip, output);
 
     printf("test %02zu ... ", test_counter);
 
-    char *output_string = ast_to_string(&worker.arena, output);
+    char *output_string = ast_to_string(ip.arena, output);
     if (strcmp(output_string, test_source) != 0) {
-        printf("FAILED\n");
-
-#if 0
-        printf("source='%s'\n", source);
-#endif
-        
+        printf("FAILED\n");        
         printf("'%s'\n", output_string);
         printf("!=\n");
         printf("'%s'\n", test_source);
@@ -105,9 +105,9 @@ void test_ast(char *source, char *test_source) {
         printf("OK\n");
     }
 
-    arena_free(&worker.arena);
-
     test_counter += 1;
+
+    arena_free(&arena);
 }
 
 void test() {
@@ -218,6 +218,22 @@ void test() {
     printf("\n\n");
 }
 
+void main_cli() {
+    Arena arena = init_arena();
+
+    Lexer lexer = {0};
+    lexer.source = "1.2*4";
+    lexer.arena = &arena;
+
+    Interp ip = {0};
+    ip.arena = &arena;
+
+    AST* output = parse(&lexer);
+    output = interp(&ip, output);
+
+    arena_free(&arena);
+}
+
 i32 main(i32 argc, char *argv[]) {
     bool do_test = false;
     bool do_cli = true;
@@ -241,21 +257,7 @@ i32 main(i32 argc, char *argv[]) {
     }
 
     if (do_cli) {
-        Worker worker = create_worker();
-
-        char *source = "1.2*4";
-
-        AST *ast = parse_from_string(&worker, source);
-        // AST *output = interp_from_string(&worker, source);
-        
-        // print_tokens_from_string(source);
-        // printf("%s\n", ast_to_debug_string(&worker.arena, ast));
-        assert(ast->binop.left->real.value == 1.2);
-        printf("%s\n", ast_to_string(&worker.arena, ast));
-        printf("%u\n", worker.arena.reallocs_count);
-        // printf("%s\n", ast_to_debug_string(&worker.arena, output));
-
-        arena_free(&worker.arena);
+        main_cli();
     } else if (do_gui) {
         init_gui();
     } else {

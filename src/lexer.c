@@ -40,12 +40,6 @@ void lexer_print_tokens(Lexer *lexer) {
     printf("\n");
 }
 
-void print_tokens_from_string(char* source) {
-    Lexer lexer = {0};
-    lexer.source = source;
-    lexer_print_tokens(&lexer);
-}
-
 inline char lexer_current_char(Lexer *lexer) {
     return lexer->source[lexer->pos];
 }

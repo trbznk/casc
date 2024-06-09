@@ -7,3 +7,4 @@ shaders/frag.spv
 shaders/vert.spv
 fonts
 **/.DS_Store
+tmp.c

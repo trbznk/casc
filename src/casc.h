@@ -25,7 +25,6 @@ typedef double f64;
 typedef struct AST AST;
 typedef struct Parser Parser;
 typedef struct Arena Arena;
-typedef struct Worker Worker;
 
 //
 // lexer
@@ -34,6 +33,8 @@ typedef struct Worker Worker;
 extern const char *BUILTIN_FUNCTIONS[];
 extern const usize BUILTIN_FUNCTIONS_COUNT;
 
+// maybe we treat 'constant' symbols like pi or e in the future as normal variables
+// that already have a value @todo @remove
 extern const char *BUILTIN_CONSTANTS[];
 extern const usize BUILTIN_CONSTANTS_COUNT;
 
@@ -66,6 +67,7 @@ typedef struct {
 
 typedef struct Lexer Lexer;
 struct Lexer {
+    Arena *arena;
     char* source;
     usize pos;
 };
@@ -74,7 +76,6 @@ char lexer_current_char(Lexer*);
 Token lexer_peek_token(Lexer*);
 Token lexer_next_token(Lexer*);
 void lexer_print_tokens(Lexer*);
-void print_tokens_from_string(char*);
 
 const char* token_type_to_string(TokenType);
 
@@ -85,22 +86,15 @@ bool is_builtin_constant(char*);
 // ast
 //
 
-#define create_ast_integer(value) _create_ast_integer(&worker->arena, value)
-#define INTEGER(value) _create_ast_integer(&worker->arena, value)
-#define create_ast_real(value) _create_ast_real(&worker->arena, value)
-#define REAL(value) _create_ast_real(&worker->arena, value)
-#define create_ast_symbol(name) _create_ast_symbol(&worker->arena, name)
-#define SYMBOL(name) _create_ast_symbol(&worker->arena, name)
-#define create_ast_add(left, right) _create_ast_binop(&worker->arena, left, right, OP_ADD)
-#define ADD(left, right) _create_ast_binop(&worker->arena, left, right, OP_ADD)
-#define create_ast_sub(left, right) _create_ast_binop(&worker->arena, left, right, OP_SUB)
-#define SUB(left, right) _create_ast_binop(&worker->arena, left, right, OP_SUB)
-#define create_ast_mul(left, right) _create_ast_binop(&worker->arena, left, right, OP_MUL)
-#define MUL(left, right) _create_ast_binop(&worker->arena, left, right, OP_MUL)
-#define create_ast_div(left, right) _create_ast_binop(&worker->arena, left, right, OP_DIV)
-#define DIV(left, right) _create_ast_binop(&worker->arena, left, right, OP_DIV)
-#define create_ast_pow(left, right) _create_ast_binop(&worker->arena, left, right, OP_POW)
-#define POW(left, right) _create_ast_binop(&worker->arena, left, right, OP_POW)
+#define INTEGER(value) init_ast_integer(ip->arena, value)
+#define REAL(value) init_ast_real(ip->arena, value)
+#define SYMBOL(name) init_ast_symbol(ip->arena, name)
+#define ADD(left, right) init_ast_binop(ip->arena, left, right, OP_ADD)
+#define SUB(left, right) init_ast_binop(ip->arena, left, right, OP_SUB)
+#define MUL(left, right) init_ast_binop(ip->arena, left, right, OP_MUL)
+#define DIV(left, right) init_ast_binop(ip->arena, left, right, OP_DIV)
+#define POW(left, right) init_ast_binop(ip->arena, left, right, OP_POW)
+#define CALL(name, args) init_ast_call(ip->arena, name, args)
 
 typedef struct ASTArray ASTArray;
 
@@ -174,13 +168,13 @@ struct AST {
     };
 };
 
-AST* _create_ast_integer(Arena*, i64);
-AST* _create_ast_real(Arena*, f64);
-AST* _create_ast_symbol(Arena*, char*);
-AST* _create_ast_binop(Arena*, AST*, AST*, OpType);
-AST* create_ast_unaryop(Arena*, AST*, OpType);
-AST* create_ast_call(Arena*, char*, ASTArray);
-AST* create_ast_empty(Arena*);
+AST* init_ast_integer(Arena*, i64);
+AST* init_ast_real(Arena*, f64);
+AST* init_ast_symbol(Arena*, char*);
+AST* init_ast_binop(Arena*, AST*, AST*, OpType);
+AST* init_ast_unaryop(Arena*, AST*, OpType);
+AST* init_ast_call(Arena*, char*, ASTArray);
+AST* init_ast_empty(Arena*);
 
 void ast_array_append(Arena*, ASTArray*, AST*);
 
@@ -200,20 +194,22 @@ f64 ast_to_f64(AST*);
 // parser
 //
 
-AST* parse(Worker*);
-AST* parse_expr(Worker*);
-AST* parse_factor(Worker*);
-
-AST* parse_from_string(Worker*, char*);
+AST* parse(Lexer*);
+AST* parse_expr(Lexer*);
+AST* parse_factor(Lexer*);
 
 //
 // interp
 //
 
-AST *interp(Worker*, AST*);
-AST *interp_binop_pow(Worker*, AST*);
+typedef struct {
+    Arena *arena;
+} Interp;
 
-AST* interp_from_string(Worker*, char*);
+AST *interp(Interp*, AST*);
+AST *interp_binop_pow(Interp*, AST*);
+
+AST* interp_from_string(Interp*, char*);
 
 bool ast_match(AST*, AST*);
 bool ast_match_type(AST*, AST*);
@@ -244,13 +240,7 @@ struct Arena {
     u32 reallocs_count;
 };
 
-Arena create_arena(usize);
+Arena init_arena();
 void arena_free(Arena*);
 void *arena_alloc(Arena*, usize);
 
-struct Worker {
-    Arena arena;
-    Lexer lexer;
-};
-
-Worker create_worker();

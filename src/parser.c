@@ -6,58 +6,58 @@
 
 #include "casc.h"
 
-void parser_eat(Worker *w, TokenType type) {
-    if (lexer_peek_token(&w->lexer).type == type) {
-        lexer_next_token(&w->lexer);
+void parser_eat(Lexer *lexer, TokenType type) {
+    if (lexer_peek_token(lexer).type == type) {
+        lexer_next_token(lexer);
     } else {
-        fprintf(stderr, "ERROR: Expected %s got %s.\n", token_type_to_string(type), token_type_to_string(lexer_peek_token(&w->lexer).type));
+        fprintf(stderr, "ERROR: Expected %s got %s.\n", token_type_to_string(type), token_type_to_string(lexer_peek_token(lexer).type));
         assert(false);
     }
 }
 
-AST *parse_exp(Worker* worker) {
-    Token token = lexer_peek_token(&worker->lexer);
+AST *parse_exp(Lexer *lexer) {
+    Token token = lexer_peek_token(lexer);
 
     switch (token.type) {
         case TOKEN_NUMBER:
-            parser_eat(worker, TOKEN_NUMBER);
+            parser_eat(lexer, TOKEN_NUMBER);
             if (token.contains_dot) {
-                return create_ast_real(strtod(token.text, NULL));
+                return init_ast_real(lexer->arena, strtod(token.text, NULL));
             } else {
-                return create_ast_integer(atoi(token.text));
+                return init_ast_integer(lexer->arena, atoi(token.text));
             }
         case TOKEN_IDENTIFIER:
             if (is_builtin_function(token.text)) {
-                parser_eat(worker, TOKEN_IDENTIFIER);
-                parser_eat(worker, TOKEN_L_PAREN);
+                parser_eat(lexer, TOKEN_IDENTIFIER);
+                parser_eat(lexer, TOKEN_L_PAREN);
 
                 ASTArray args = {0};
-                ast_array_append(&worker->arena, &args, parse_expr(worker));
-                while (lexer_peek_token(&worker->lexer).type == TOKEN_COMMA) {
-                    parser_eat(worker, TOKEN_COMMA);
-                    ast_array_append(&worker->arena, &args, parse_expr(worker));
+                ast_array_append(lexer->arena, &args, parse_expr(lexer));
+                while (lexer_peek_token(lexer).type == TOKEN_COMMA) {
+                    parser_eat(lexer, TOKEN_COMMA);
+                    ast_array_append(lexer->arena, &args, parse_expr(lexer));
                 }
 
-                parser_eat(worker, TOKEN_R_PAREN);
-                return create_ast_call(&worker->arena, token.text, args);
+                parser_eat(lexer, TOKEN_R_PAREN);
+                return init_ast_call(lexer->arena, token.text, args);
             } else {
-                parser_eat(worker, TOKEN_IDENTIFIER);
-                return _create_ast_symbol(&worker->arena, token.text);
+                parser_eat(lexer, TOKEN_IDENTIFIER);
+                return init_ast_symbol(lexer->arena, token.text);
             }
         case TOKEN_L_PAREN:
-            parser_eat(worker, TOKEN_L_PAREN);
-            AST* r = parse_expr(worker);
-            parser_eat(worker, TOKEN_R_PAREN);
+            parser_eat(lexer, TOKEN_L_PAREN);
+            AST* r = parse_expr(lexer);
+            parser_eat(lexer, TOKEN_R_PAREN);
             return r;
         case TOKEN_MINUS:
-            parser_eat(worker, TOKEN_MINUS);
-            return create_ast_unaryop(&worker->arena, parse_factor(worker), OP_USUB);
+            parser_eat(lexer, TOKEN_MINUS);
+            return init_ast_unaryop(lexer->arena, parse_factor(lexer), OP_USUB);
         case TOKEN_PLUS:
-            parser_eat(worker, TOKEN_PLUS);
-            return create_ast_unaryop(&worker->arena, parse_factor(worker), OP_UADD);
+            parser_eat(lexer, TOKEN_PLUS);
+            return init_ast_unaryop(lexer->arena, parse_factor(lexer), OP_UADD);
         case TOKEN_EOF:
             // I think we can ignore EOF token for now and simply return it
-            return create_ast_empty(&worker->arena);
+            return init_ast_empty(lexer->arena);
         default:
             printf("%s\n", token_type_to_string(token.type));
             assert(false);
@@ -65,44 +65,44 @@ AST *parse_exp(Worker* worker) {
 
 }
 
-AST *parse_factor(Worker *w) {
-    AST* result = parse_exp(w);
+AST *parse_factor(Lexer *lexer) {
+    AST *result = parse_exp(lexer);
 
-     while (lexer_peek_token(&w->lexer).type == TOKEN_CARET) {
-        parser_eat(w, TOKEN_CARET);
+     while (lexer_peek_token(lexer).type == TOKEN_CARET) {
+        parser_eat(lexer, TOKEN_CARET);
         // when we use the same hierachy pattern like in parse_term or parse_expr, we need to call
         // parse_expr here. But unlike with addition and multiplication we want to parse pow operation
         // from right to left (this is more common, e.g. desmos, python, ...). 
         // For now I dont know if there are any edge cases, where this implementation is wrong.
-        result = _create_ast_binop(&w->arena, result, parse_factor(w), OP_POW);
+        result = init_ast_binop(lexer->arena, result, parse_factor(lexer), OP_POW);
     }
 
     return result;
 }
 
-AST* parse_term(Worker* w) {
-    AST* result = parse_factor(w);
+AST *parse_term(Lexer *lexer) {
+    AST* result = parse_factor(lexer);
 
     while (
-        lexer_peek_token(&w->lexer).type == TOKEN_STAR ||
-        lexer_peek_token(&w->lexer).type == TOKEN_SLASH ||
-        lexer_peek_token(&w->lexer).type == TOKEN_IDENTIFIER ||
-        lexer_peek_token(&w->lexer).type == TOKEN_L_PAREN
+        lexer_peek_token(lexer).type == TOKEN_STAR ||
+        lexer_peek_token(lexer).type == TOKEN_SLASH ||
+        lexer_peek_token(lexer).type == TOKEN_IDENTIFIER ||
+        lexer_peek_token(lexer).type == TOKEN_L_PAREN
     ) {
-        switch (lexer_peek_token(&w->lexer).type) {
+        switch (lexer_peek_token(lexer).type) {
             case TOKEN_STAR:
-                parser_eat(w, TOKEN_STAR);
-                result = _create_ast_binop(&w->arena, result, parse_factor(w), OP_MUL);
+                parser_eat(lexer, TOKEN_STAR);
+                result = init_ast_binop(lexer->arena, result, parse_factor(lexer), OP_MUL);
                 break;
             case TOKEN_SLASH:
-                parser_eat(w, TOKEN_SLASH);
-                result = _create_ast_binop(&w->arena, result, parse_factor(w), OP_DIV);
+                parser_eat(lexer, TOKEN_SLASH);
+                result = init_ast_binop(lexer->arena, result, parse_factor(lexer), OP_DIV);
                 break;
             case TOKEN_IDENTIFIER:
-                result = _create_ast_binop(&w->arena, result, parse_factor(w), OP_MUL);
+                result = init_ast_binop(lexer->arena, result, parse_factor(lexer), OP_MUL);
                 break;
             case TOKEN_L_PAREN:
-                result = _create_ast_binop(&w->arena, result, parse_exp(w), OP_MUL);
+                result = init_ast_binop(lexer->arena, result, parse_exp(lexer), OP_MUL);
                 break;
             default:
                 assert(false);
@@ -112,30 +112,24 @@ AST* parse_term(Worker* w) {
     return result;
 }
 
-AST* parse_expr(Worker* w) {
-    AST* result = parse_term(w);
+AST *parse_expr(Lexer* lexer) {
+    AST* result = parse_term(lexer);
 
-    while (lexer_peek_token(&w->lexer).type == TOKEN_PLUS || lexer_peek_token(&w->lexer).type == TOKEN_MINUS) {
-        if (lexer_peek_token(&w->lexer).type == TOKEN_PLUS) {
-            parser_eat(w, TOKEN_PLUS);
-            result = _create_ast_binop(&w->arena, result, parse_term(w), OP_ADD);
-        } else if (lexer_peek_token(&w->lexer).type == TOKEN_MINUS) {
-            parser_eat(w, TOKEN_MINUS);
-            result = _create_ast_binop(&w->arena, result, parse_term(w), OP_SUB);
+    while (lexer_peek_token(lexer).type == TOKEN_PLUS || lexer_peek_token(lexer).type == TOKEN_MINUS) {
+        if (lexer_peek_token(lexer).type == TOKEN_PLUS) {
+            parser_eat(lexer, TOKEN_PLUS);
+            result = init_ast_binop(lexer->arena, result, parse_term(lexer), OP_ADD);
+        } else if (lexer_peek_token(lexer).type == TOKEN_MINUS) {
+            parser_eat(lexer, TOKEN_MINUS);
+            result = init_ast_binop(lexer->arena, result, parse_term(lexer), OP_SUB);
         }
     }
 
     return result;
 }
 
-AST* parse(Worker *w) {
-    AST* result = parse_expr(w);
-    assert(lexer_peek_token(&w->lexer).type == TOKEN_EOF);
+AST *parse(Lexer *lexer) {
+    AST* result = parse_expr(lexer);
+    assert(lexer_peek_token(lexer).type == TOKEN_EOF);
     return result;
-}
-
-AST* parse_from_string(Worker *worker, char *source) {
-    worker->lexer.source = source;
-    AST* ast = parse(worker);
-    return ast;
 }
