@@ -99,20 +99,20 @@ AST* init_ast_symbol(Arena* arena, char *name) {
     return node;
 }
 
-AST* init_ast_binop(Arena* arena, AST* left, AST* right, OpType type) {
+AST* init_ast_binop(Arena* arena, AST* left, AST* right, OpType op) {
     AST *node = arena_alloc(arena, sizeof(AST));
     node->type = AST_BINOP;
     node->binop.left = left;
     node->binop.right = right;
-    node->binop.type = type;
+    node->binop.op = op;
     return node;
 }
 
-AST* init_ast_unaryop(Arena* arena, AST* expr, OpType type) {
+AST* init_ast_unaryop(Arena* arena, AST* operand, OpType op) {
     AST* node = arena_alloc(arena, sizeof(AST));
     node->type = AST_UNARYOP;
-    node->unaryop.expr = expr;
-    node->unaryop.type = type;
+    node->unaryop.operand = operand;
+    node->unaryop.op = op;
     return node;
 }
 
@@ -181,18 +181,32 @@ bool ast_contains(AST *node, AST *target) {
 
 f64 ast_to_f64(AST *node) {
     switch (node->type) {
-        case AST_INTEGER: return (f64) node->integer.value;
-        case AST_REAL:    return node->real.value;
-        default:          panic("not allowed");
+        case AST_INTEGER:
+            return (f64) node->integer.value;
+        case AST_REAL:
+            return node->real.value;
+        case AST_BINOP:
+            assert(ast_is_numeric(node));
+            assert(node->binop.left->type == AST_INTEGER);
+            assert(node->binop.right->type == AST_INTEGER);
+            return (f64) node->binop.left->integer.value / (f64) node->binop.right->integer.value;
+        default: 
+            panic("not allowed");
     }
 }
 
 bool ast_is_numeric(AST* node) {
-    switch (node->type) {
-        case AST_INTEGER:
-        case AST_REAL:
-            return true;
-        default:
-            return false;
+    if (node->type == AST_INTEGER || node->type == AST_REAL) {
+        return true;
     }
+
+    if (node->type == AST_BINOP) {
+        if (node->binop.op == OP_DIV) {
+            if (ast_is_numeric(node->binop.left) && ast_is_numeric(node->binop.right)) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }

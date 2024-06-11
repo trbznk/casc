@@ -151,12 +151,12 @@ struct AST {
         struct {
             AST *left;
             AST *right;
-            OpType type;
+            OpType op;
         } binop;
 
         struct {
-            AST *expr;
-            OpType type;
+            AST *operand;
+            OpType op;
         } unaryop;
 
         struct {
@@ -207,7 +207,7 @@ typedef struct {
 } Interp;
 
 AST *interp(Interp*, AST*);
-AST *interp_binop_pow(Interp*, AST*);
+AST *interp_binop_pow(Interp*, AST*, AST*);
 
 AST* interp_from_string(Interp*, char*);
 

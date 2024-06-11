@@ -222,15 +222,19 @@ void main_cli() {
     Arena arena = init_arena();
 
     Lexer lexer = {0};
-    lexer.source = "log(1, 10)";
+    lexer.source = "-8^8";
     lexer.arena = &arena;
 
     Interp ip = {0};
     ip.arena = &arena;
 
     AST* output = parse(&lexer);
+    printf("parsed:\n");
+    printf("%s\n", ast_to_debug_string(&arena, output));
+
     output = interp(&ip, output);
 
+    printf("output:\n");
     printf("%s\n", ast_to_debug_string(&arena, output));
     printf("%s\n", ast_to_string(&arena, output));
 
