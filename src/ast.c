@@ -63,8 +63,16 @@ u8 op_type_precedence(OpType type) {
 }
 
 void ast_array_append(Arena *arena, ASTArray *array, AST *node) {
-    array->data = arena_alloc(arena, sizeof(AST));
-    array->data[array->size] = node;
+    AST **new_data = arena_alloc(arena, sizeof(AST)*(array->size+1));
+
+    // currently we move old values to new_data because
+    // there is no real realloc for arena @cleanup
+    for (usize i = 0; i < array->size; i++) {
+        new_data[i] = array->data[i];
+    }
+    new_data[array->size] = node;
+
+    array->data = new_data;
     array->size++;
 };
 

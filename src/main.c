@@ -78,13 +78,12 @@ void *arena_alloc(Arena *arena, usize size) {
     return memory;
 }
 
-void test_ast(char *source, char *test_source) {
-    static usize test_counter = 1;
-
+void _test_ast(u32 line_number, char *source, char *test_source) {
     Arena arena = init_arena();
 
     Lexer lexer = {0};
     lexer.source = source;
+    lexer.arena = &arena;
 
     Interp ip = {0};
     ip.arena = &arena;
@@ -92,7 +91,7 @@ void test_ast(char *source, char *test_source) {
     AST* output = parse(&lexer);
     output = interp(&ip, output);
 
-    printf("test %02zu ... ", test_counter);
+    printf("test:%d ... ", line_number);
 
     char *output_string = ast_to_string(ip.arena, output);
     if (strcmp(output_string, test_source) != 0) {
@@ -105,12 +104,13 @@ void test_ast(char *source, char *test_source) {
         printf("OK\n");
     }
 
-    test_counter += 1;
-
     arena_free(&arena);
 }
 
 void test() {
+
+    #define test_ast(source, test_source) _test_ast(__LINE__, source, test_source)
+
     // ruslanspivak interpreter tutorial tests
     test_ast("27 + 3", "30");
     test_ast("27 - 7", "20");
@@ -222,7 +222,7 @@ void main_cli() {
     Arena arena = init_arena();
 
     Lexer lexer = {0};
-    lexer.source = "1.2*4";
+    lexer.source = "log(1, 10)";
     lexer.arena = &arena;
 
     Interp ip = {0};
@@ -230,6 +230,9 @@ void main_cli() {
 
     AST* output = parse(&lexer);
     output = interp(&ip, output);
+
+    printf("%s\n", ast_to_debug_string(&arena, output));
+    printf("%s\n", ast_to_string(&arena, output));
 
     arena_free(&arena);
 }

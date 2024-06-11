@@ -335,50 +335,43 @@ AST* diff(Interp *ip, AST *expr, AST *var) {
     }
 }
 
-AST *interp_sin(Interp *ip, AST* node) {
-    assert(node->func_call.args.size == 1);
-    AST *arg = node->func_call.args.data[0];
-
-    if (ast_match(arg, SYMBOL("pi"))) {
+AST *interp_sin(Interp *ip, AST* x) {
+    if (ast_match(x, SYMBOL("pi"))) {
         return INTEGER(0);
-    } else if (arg->type == AST_INTEGER || arg->type == AST_REAL) {
-        f64 value = ast_to_f64(arg);
+    } else if (x->type == AST_INTEGER || x->type == AST_REAL) {
+        f64 value = ast_to_f64(x);
         return interp(ip, REAL(sin(value)));
     }
     
-    return node;
+    ASTArray args = {0};
+    ast_array_append(ip->arena, &args, x);
+    return CALL("sin", args);
 }
 
-AST *interp_cos(Interp *ip, AST* node) {
-    assert(node->func_call.args.size == 1);
-    AST *arg = node->func_call.args.data[0];
-    
-    if (ast_match(arg, INTEGER(0))) {
+AST *interp_cos(Interp *ip, AST* x) {    
+    if (ast_match(x, INTEGER(0))) {
         return INTEGER(1);
-    } else if (ast_match(arg, DIV(SYMBOL("pi"), INTEGER(2)))) {
+    } else if (ast_match(x, DIV(SYMBOL("pi"), INTEGER(2)))) {
         return INTEGER(0);
-    } else if (ast_match(arg, SYMBOL("pi"))) {
+    } else if (ast_match(x, SYMBOL("pi"))) {
         return INTEGER(-1);
-    } else if (arg->type == AST_INTEGER || arg->type == AST_REAL) {
-        f64 value = ast_to_f64(arg);
+    } else if (x->type == AST_INTEGER || x->type == AST_REAL) {
+        f64 value = ast_to_f64(x);
         return interp(ip, REAL(cos(value)));
     }
 
-    return node;
+    ASTArray args = {0};
+    ast_array_append(ip->arena, &args, x);
+    return CALL("cos", args);
 }
 
-AST* interp_call(Interp *ip, AST* node) {
-    // we need a proper system for checking and using args (function definitions and function signatures) @ƒeature
+AST* interp_call(Interp *ip, char *name, ASTArray args) {
 
-    char *func_name = node->func_call.name;
-
-    for (usize i = 0; i < node->func_call.args.size; i++) {
-        node->func_call.args.data[i] = interp(ip, node->func_call.args.data[i]);
+    for (usize i = 0; i < args.size; i++) {
+        args.data[i] = interp(ip, args.data[i]);
     }
 
-    ASTArray args = node->func_call.args;
-
-    if (!strcmp(func_name, "sqrt") && args.data[0]->type == AST_INTEGER) {
+    if (!strcmp(name, "sqrt") && args.data[0]->type == AST_INTEGER) {
         double result = sqrt((double)args.data[0]->integer.value);
 
         if (fmod((double)args.data[0]->integer.value, result) == 0.0) {
@@ -394,21 +387,21 @@ AST* interp_call(Interp *ip, AST* node) {
                 i32 p = args.data[0]->integer.value / q;
                 ASTArray new_args = {0};
                 ast_array_append(ip->arena, &new_args, INTEGER(p));
-                return MUL(INTEGER((i64)sqrt_of_q), CALL(func_name, new_args));
+                return MUL(INTEGER((i64)sqrt_of_q), CALL(name, new_args));
             }
         }
-    } else if (!strcmp(func_name, "ln")) {
+    } else if (!strcmp(name, "ln")) {
         if (ast_match(args.data[0], SYMBOL("e"))) {
             return INTEGER(1);
         } else if (ast_match(args.data[0], INTEGER(1))) {
             return INTEGER(0);
         }
-    } else if (!strcmp(func_name, "log")) {
-        if (node->func_call.args.size == 2) {
+    } else if (!strcmp(name, "log")) {
+        if (args.size == 2) {
             // log_b(y) = x
             // b^x = y
-            AST* y = node->func_call.args.data[0];
-            AST* b = node->func_call.args.data[1];
+            AST* y = args.data[0];
+            AST* b = args.data[1];
             if (ast_match(y, INTEGER(1))) {
                 return INTEGER(0);
             } else if (ast_match(y, b)) {
@@ -417,15 +410,17 @@ AST* interp_call(Interp *ip, AST* node) {
         } else {
             assert(false);
         }
-    } else if (!strcmp(func_name, "sin")) {
-        return interp_sin(ip, node);
-    } else if (!strcmp(func_name, "cos")) {
-        return interp_cos(ip, node);
-    } else if (!strcmp(func_name, "diff")) {
+    } else if (!strcmp(name, "sin")) {
+        assert(args.size == 1);
+        return interp_sin(ip, args.data[0]);
+    } else if (!strcmp(name, "cos")) {
+        assert(args.size == 1);
+        return interp_cos(ip, args.data[0]);
+    } else if (!strcmp(name, "diff")) {
         AST* diff_var;
 
-        if (node->func_call.args.size == 1) {
-            ASTArray nodes = ast_to_flat_array(ip->arena, node);
+        if (args.size == 1) {
+            ASTArray nodes = ast_to_flat_array(ip->arena, args.data[0]);
             bool symbol_seen = false;
             AST *symbol;
             for (usize i = 0; i < nodes.size; i++) {
@@ -440,17 +435,17 @@ AST* interp_call(Interp *ip, AST* node) {
             }
             assert(symbol_seen);
             diff_var = symbol;
-        } else if (node->func_call.args.size == 2) {
-            assert(node->func_call.args.data[1]->type == AST_SYMBOL);
-            diff_var = node->func_call.args.data[1];
+        } else if (args.size == 2) {
+            assert(args.data[1]->type == AST_SYMBOL);
+            diff_var = args.data[1];
         } else {
             assert(false);
         }
 
-        return diff(ip, node->func_call.args.data[0], diff_var);
+        return diff(ip, args.data[0], diff_var);
     }
 
-    return node;
+    return CALL(name, args);
 }
 
 AST* interp(Interp *ip, AST* node) {
@@ -470,7 +465,7 @@ AST* interp(Interp *ip, AST* node) {
             return node;
         }
         case AST_CALL:
-            return interp_call(ip, node);
+            return interp_call(ip, node->func_call.name, node->func_call.args);
         case AST_EMPTY:
             return node;
         default:
