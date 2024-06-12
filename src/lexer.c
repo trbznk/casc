@@ -8,7 +8,7 @@
 #include "casc.h"
 
 const char *BUILTIN_FUNCTIONS[] = {
-    "sqrt", "sin", "cos", "ln", "exp", "log", "diff"
+    "sqrt", "sin", "cos", "tan", "ln", "exp", "log", "diff"
 };
 const usize BUILTIN_FUNCTIONS_COUNT = sizeof(BUILTIN_FUNCTIONS) / sizeof(BUILTIN_FUNCTIONS[0]);
 

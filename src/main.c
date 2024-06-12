@@ -222,7 +222,7 @@ void main_cli() {
     Arena arena = init_arena();
 
     Lexer lexer = {0};
-    lexer.source = "-8^8";
+    lexer.source = "-23/24";
     lexer.arena = &arena;
 
     Interp ip = {0};

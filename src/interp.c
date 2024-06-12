@@ -357,6 +357,35 @@ AST *interp_cos(Interp *ip, AST* x) {
     return CALL("cos", args);
 }
 
+AST *interp_tan(Interp *ip, AST* x) {
+    if (ast_is_numeric(x)) {
+        f64 value = ast_to_f64(x);
+        return interp(ip, REAL(tan(value)));
+    }
+    
+    ASTArray args = {0};
+    ast_array_append(ip->arena, &args, x);
+    return CALL("tan", args);
+}
+
+AST *interp_log(Interp *ip, AST *y, AST *b) {
+    // log_b(y) = x
+    // b^x = y
+    if (ast_match(y, INTEGER(1))) {
+        return INTEGER(0);
+    } else if (ast_match(y, b)) {
+        return INTEGER(1);
+    }
+
+
+    // TODO: implement maybe variadic function or macro to simplify ast array
+    //       creation from with args given.
+    ASTArray args = {0};
+    ast_array_append(ip->arena, &args, y);
+    ast_array_append(ip->arena, &args, b);
+    return CALL("log", args);
+}
+
 AST* interp_call(Interp *ip, char *name, ASTArray args) {
 
     for (usize i = 0; i < args.size; i++) {
@@ -389,25 +418,17 @@ AST* interp_call(Interp *ip, char *name, ASTArray args) {
             return INTEGER(0);
         }
     } else if (!strcmp(name, "log")) {
-        if (args.size == 2) {
-            // log_b(y) = x
-            // b^x = y
-            AST* y = args.data[0];
-            AST* b = args.data[1];
-            if (ast_match(y, INTEGER(1))) {
-                return INTEGER(0);
-            } else if (ast_match(y, b)) {
-                return INTEGER(1);
-            }
-        } else {
-            assert(false);
-        }
+        assert(args.size == 2);
+        return interp_log(ip, args.data[0], args.data[1]);
     } else if (!strcmp(name, "sin")) {
         assert(args.size == 1);
         return interp_sin(ip, args.data[0]);
     } else if (!strcmp(name, "cos")) {
         assert(args.size == 1);
         return interp_cos(ip, args.data[0]);
+    } else if (!strcmp(name, "tan")) {
+        assert(args.size == 1);
+        return interp_tan(ip, args.data[0]);
     } else if (!strcmp(name, "diff")) {
         AST* diff_var;
 
