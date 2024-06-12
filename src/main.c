@@ -37,6 +37,15 @@ void arena_reset(Arena *arena) {
 }
 
 void *arena_alloc(Arena *arena, usize size) {
+# if 1
+    static bool has_seen_arena_alloc_malloc_warning = false;
+    if (!has_seen_arena_alloc_malloc_warning) {
+        printf("WARNING: currently arena is using malloc always!\n");
+        has_seen_arena_alloc_malloc_warning = true;
+    }
+    return malloc(size);
+#endif
+
     usize free_capacity = arena->size - arena->offset;
 
 #if 0
@@ -214,6 +223,8 @@ void test() {
     test_ast("-8^8", "-16777216");
     test_ast("(-29*-17)", "493");
     test_ast("(-24--40)", "16");
+    test_ast("1/3*2", "2/3");
+    test_ast("1/8 + 1", "9/8");
 
     printf("\n\n");
 }
@@ -222,7 +233,7 @@ void main_cli() {
     Arena arena = init_arena();
 
     Lexer lexer = {0};
-    lexer.source = "-23/24";
+    lexer.source = "1/8 * (-4-2*4/3-1)";
     lexer.arena = &arena;
 
     Interp ip = {0};

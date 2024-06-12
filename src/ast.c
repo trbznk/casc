@@ -109,7 +109,7 @@ AST* init_ast_binop(Arena* arena, AST* left, AST* right, OpType op) {
 }
 
 AST* init_ast_unaryop(Arena* arena, AST* operand, OpType op) {
-    AST* node = arena_alloc(arena, sizeof(AST));
+    AST *node = arena_alloc(arena, sizeof(AST));
     node->type = AST_UNARYOP;
     node->unaryop.operand = operand;
     node->unaryop.op = op;
@@ -193,6 +193,16 @@ f64 ast_to_f64(AST *node) {
         default: 
             panic("not allowed");
     }
+}
+
+inline bool ast_is_fraction(AST* node) {
+    if (node->type == AST_BINOP) {
+        if (node->binop.left->type == AST_INTEGER && node->binop.right->type == AST_INTEGER) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 bool ast_is_numeric(AST* node) {

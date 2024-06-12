@@ -185,6 +185,7 @@ uint8_t op_type_precedence(OpType);
 
 ASTArray ast_to_flat_array(Arena*, AST*);
 bool ast_contains(AST*, AST*);
+bool ast_is_fraction(AST*);
 bool ast_is_numeric(AST*);
 
 f64 ast_to_f64(AST*);

@@ -143,96 +143,119 @@ char *_ast_to_string(Arena *arena, AST* node, uint8_t op_precedence) {
 }
 
 AST* interp_binop_add(Interp *ip, AST *left, AST *right) {
-    left = interp(ip, left);
-    right = interp(ip, right);
-
-    if (ast_is_numeric(left) && ast_is_numeric(right)) {
-        return interp(ip, REAL(ast_to_f64(left)+ast_to_f64(right)));
-    } else if (ast_match(left, INTEGER(0))) {
+    // basic rules
+    if (ast_match(left, INTEGER(0))) {
         return right;
     } else if (ast_match(right, INTEGER(0))) {
         return left;
     } else if (ast_match(left, right)) {
-        return MUL(INTEGER(2), left);
-    } else if (ast_match_type(left, DIV(INTEGER(1), INTEGER(1))) && ast_match_type(right, DIV(INTEGER(1), INTEGER(1)))) {
+        return interp(ip, MUL(INTEGER(2), left));
+    }
+    
+    // fractions
+    if (ast_is_fraction(left) && ast_is_fraction(right)) {
         // a/b + c/d
         i64 a = left->binop.left->integer.value;
         i64 b = left->binop.right->integer.value;
         i64 c = right->binop.left->integer.value;
         i64 d = right->binop.right->integer.value;
         return interp_binop_div(ip, INTEGER(a*d+c*b), INTEGER(b*d));
-    } else if (left->type == AST_INTEGER && right->type == AST_BINOP && right->binop.op == OP_DIV) {
+    } else if (left->type == AST_INTEGER && ast_is_fraction(right)) {
         // c + a/b
         // -> (cb)/b + a/b
-        return interp_binop_add(ip, DIV(MUL(left, right->binop.right), right->binop.right), right);
-    } else if (left->type == AST_BINOP && left->binop.op == OP_MUL) {
+        // -> (cb+a)/b
+        AST *c = left;
+        AST *a = right->binop.left;
+        AST *b = right->binop.right;
+        // we need depth again so interp instead of interp_binop_add
+        return interp(ip, DIV(ADD(MUL(c, b), a), b));
+    } else if (ast_is_fraction(left) && right->type == AST_INTEGER) {
+        return interp_binop_add(ip, right, left);
+    }
+    
+    // TODO: remember which rule this is and simplify it
+    if (left->type == AST_BINOP && left->binop.op == OP_MUL) {
         if (ast_match(left->binop.right, right)) {
             AST *new_left = interp_binop_add(ip, INTEGER(1), left->binop.left);
             return MUL(new_left, right);
         }
     }
+    
+    if (ast_is_numeric(left) && ast_is_numeric(right)) {
+        return interp(ip, REAL(ast_to_f64(left)+ast_to_f64(right)));
+    }
+    
     return ADD(left, right);
 }
 
 AST* interp_binop_sub(Interp *ip, AST *left, AST *right) {
-    left = interp(ip, left);
-    right = interp(ip, right);
-
-    if (ast_is_numeric(left) && ast_is_numeric(right)) {
-        return interp(ip, REAL(ast_to_f64(left)-ast_to_f64(right)));
-    } else if (ast_match_type(left, INTEGER(1)) && ast_match_type(right, DIV(INTEGER(1), INTEGER(1)))) {
-        // a - b/c -> ac/c - b/c = (ac-b)/c
+    
+    if (ast_match_type(left, INTEGER(1)) && ast_match_type(right, DIV(INTEGER(1), INTEGER(1)))) {
+        //   a - b/c
+        // = ac/c - b/c
+        // = (ac-b)/c
         AST* a = left;
         AST* b = right->binop.left;
         AST* c = right->binop.right;
-        return interp_binop_div(ip, SUB(MUL(a, c), b), c);
-    } else if (ast_match_type(left, DIV(INTEGER(1), INTEGER(1))) && ast_match_type(right, INTEGER(1))) {
-        // a/b - c -> a/b - cb/b = (a-cb)/b
+        return interp(ip, DIV(SUB(MUL(a, c), b), c));
+    } else if (ast_is_fraction(left) && right->type == AST_INTEGER) {
+        //   a/b - c 
+        // = a/b - cb/b
+        // = (a-cb)/b
         AST *a = left->binop.left;
         AST *b = left->binop.right;
         AST *c = right;
-        AST *cb = MUL(c, b);
-        AST *numerator = SUB(a, cb);
-        return interp_binop_div(ip, numerator, b);
+        // we need depth again
+        return interp(ip, DIV(SUB(a, MUL(c, b)), b));
+    } else if (left->type == AST_INTEGER && ast_is_fraction(right)) {
+        return interp_binop_sub(ip, right, left);
     } else if (ast_match(right, INTEGER(0))) {
         return left;
+    } else if (ast_is_numeric(left) && ast_is_numeric(right)) {
+        return interp(ip, REAL(ast_to_f64(left)-ast_to_f64(right)));
     }
 
     return SUB(left, right);
 }
 
 AST* interp_binop_mul(Interp *ip, AST *left, AST *right) {
-    left = interp(ip, left);
-    right = interp(ip, right);
-
-    if (ast_is_numeric(left) && ast_is_numeric(right)) {
-        return interp(ip, REAL(ast_to_f64(left)*ast_to_f64(right)));
+    if (ast_is_fraction(left) && right->type == AST_INTEGER) {
+        // a/b * c
+        AST *a = left->binop.left;
+        AST *b = left->binop.right;
+        AST *c = right;
+        AST *num = interp(ip, MUL(a, c));
+        AST *den = b;
+        return interp(ip, DIV(num, den));
+    } else if (left->type == AST_INTEGER && ast_is_fraction(right)) {
+        return interp_binop_mul(ip, right, left);
     } else if (ast_match(left, INTEGER(0)) || ast_match(INTEGER(0), right)) {
         return INTEGER(0);
     } else if (ast_match(left, right)) {
         return interp_binop_pow(ip, left, INTEGER(2));
-    } else if (ast_match_type(left, DIV(INTEGER(1), INTEGER(1))) && ast_match_type(right, DIV(INTEGER(1), INTEGER(1)))) {
-        // a/b * c/d -> ac/bd
+    } else if (ast_is_fraction(left) && ast_is_fraction(right)) {
+        //   a/b * c/d
+        // = ac/bd
         AST *a = left->binop.left;
         AST *b = left->binop.right;
         AST *c = right->binop.left;
         AST *d = right->binop.right;
-        AST *ac = MUL(a, c);
-        AST *bd = MUL(b, d);
-        return interp_binop_div(ip, ac, bd);
+        return interp(ip, DIV(MUL(a, c), MUL(b, d)));
     } else if (ast_match(left, INTEGER(1)) || ast_match(right, INTEGER(1))) {
         if (ast_match(left, INTEGER(1))) {
             return right;
         } else {
             return left;
         }
+    } else if (ast_is_numeric(left) && ast_is_numeric(right)) {
+        return interp(ip, REAL(ast_to_f64(left)*ast_to_f64(right)));
     }
     return MUL(left, right);
 }
 
 AST* interp_binop_div(Interp *ip, AST *left, AST *right) {
-    left = interp(ip, left);
-    right = interp(ip, right);
+    assert(!ast_match(right, INTEGER(0))); // zero division
+
     if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
         if (left->integer.value % right->integer.value == 0) {
             return INTEGER(left->integer.value / right->integer.value);
@@ -250,9 +273,6 @@ AST* interp_binop_div(Interp *ip, AST *left, AST *right) {
 }
 
 AST *interp_binop_pow(Interp *ip, AST *left, AST *right) {
-    left = interp(ip, left);
-    right = interp(ip, right);
-
     if (ast_match(right, INTEGER(0))) {
         return INTEGER(1);
     } else if (ast_match(right, INTEGER(1))) {
@@ -267,6 +287,9 @@ AST *interp_binop_pow(Interp *ip, AST *left, AST *right) {
 }
 
 AST* interp_binop(Interp *ip, AST *left, AST *right, OpType op) {
+    left = interp(ip, left);
+    right = interp(ip, right);
+
     switch (op) {
         case OP_ADD: return interp_binop_add(ip, left, right);
         case OP_SUB: return interp_binop_sub(ip, left, right);
