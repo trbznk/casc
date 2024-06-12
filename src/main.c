@@ -225,6 +225,7 @@ void test() {
     test_ast("(-24--40)", "16");
     test_ast("1/3*2", "2/3");
     test_ast("1/8 + 1", "9/8");
+    test_ast("sin(4/5)*2-5.2/4", "0.134712");
 
     printf("\n\n");
 }
@@ -233,7 +234,7 @@ void main_cli() {
     Arena arena = init_arena();
 
     Lexer lexer = {0};
-    lexer.source = "1/8 * (-4-2*4/3-1)";
+    lexer.source = str_to_string(&arena, "1/8 * (-4-2*4/3-1)");
     lexer.arena = &arena;
 
     Interp ip = {0};

@@ -17,6 +17,8 @@ bool ast_match(AST* left, AST* right) {
         switch (left->type) {
             case AST_INTEGER:
                 return left->integer.value == right->integer.value;
+            case AST_REAL:
+                return left->real.value == right->real.value;
             case AST_SYMBOL:
                 return !strcmp(left->symbol.name, right->symbol.name);
             case AST_BINOP:

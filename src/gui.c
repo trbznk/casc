@@ -137,8 +137,11 @@ void init_gui() {
         DrawLine(0, line_height, screen_width, line_height, COLOR_MOONSTONE);
 
         if (cell_output_buffer != NULL) {
-            Vector2 output_text_pos = { padding.x, line_height + padding.y, };
-            DrawTextEx(font, cell_output_buffer, output_text_pos, font_size.y, 2, COLOR_DARK_GREEN);
+            printf("strlen(cell_output_buffer)=%lu\n", strlen(cell_output_buffer));
+            if (strlen(cell_output_buffer) > 0) {
+                Vector2 output_text_pos = { padding.x, line_height + padding.y, };
+                DrawTextEx(font, cell_output_buffer, output_text_pos, font_size.y, 2, COLOR_DARK_GREEN);
+            }
         }
 
         EndDrawing();
