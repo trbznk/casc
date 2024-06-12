@@ -37,7 +37,7 @@ void arena_reset(Arena *arena) {
 }
 
 void *arena_alloc(Arena *arena, usize size) {
-# if 1
+# if 0
     static bool has_seen_arena_alloc_malloc_warning = false;
     if (!has_seen_arena_alloc_malloc_warning) {
         printf("WARNING: currently arena is using malloc always!\n");
@@ -230,11 +230,75 @@ void test() {
     printf("\n\n");
 }
 
+typedef struct String String;
+struct String {
+    char *str;
+    usize size;
+};
+
+String str_to_string(Arena *arena, char *str) {
+    String s = {0};
+    s.size = strlen(str);
+    printf("s.size=%zu\n", s.size);
+    s.str = arena_alloc(arena, s.size);
+    strncpy(s.str, str, s.size);
+    return s;
+}
+
+String string_slice(Arena *arena, String s, usize start, usize stop) {
+    String new_s = {0};
+    new_s.size = stop-start;
+    new_s.str = arena_alloc(arena, new_s.size);
+    strncpy(new_s.str, &s.str[start], new_s.size);
+    return new_s;
+}
+
+String string_concat(Arena *arena, String s1, String s2) {
+    String s = {0};
+    s.size = s1.size+s2.size;
+    s.str = arena_alloc(arena, s.size);
+    strncpy(s.str, s1.str, s1.size);
+    strncpy(&s.str[s1.size], s2.str, s2.size);
+    return s;
+}
+
+bool string_eq(String s1, String s2) {
+    if (s1.size != s2.size) {
+        return false;
+    }
+
+    for (usize i = 0; i < s1.size; i++) {
+        if (s1.str[i] != s2.str[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void print(String s) {
+    for (usize i = 0; i < s.size; i++) {
+        printf("%c", s.str[i]);
+    }
+    printf("\n");
+}
+
 void main_cli() {
     Arena arena = init_arena();
 
+    String first = str_to_string(&arena, "Alexander");
+    String last = str_to_string(&arena, "Tebbe");
+    String name = string_concat(&arena, first, last);
+    assert(string_eq(name, str_to_string(&arena, "AlexanderTebbe")));
+
+    arena_free(&arena);
+}
+
+void main_cli1() {
+    Arena arena = init_arena();
+
     Lexer lexer = {0};
-    lexer.source = str_to_string(&arena, "1/8 * (-4-2*4/3-1)");
+    lexer.source = "1/8 * (-4-2*4/3-1)";
     lexer.arena = &arena;
 
     Interp ip = {0};
