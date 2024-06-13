@@ -236,7 +236,7 @@ struct String {
     usize size;
 };
 
-String str_to_string(Arena *arena, char *str) {
+String init_string(Arena *arena, char *str) {
     String s = {0};
     s.size = strlen(str);
     printf("s.size=%zu\n", s.size);
@@ -260,6 +260,14 @@ String string_concat(Arena *arena, String s1, String s2) {
     strncpy(s.str, s1.str, s1.size);
     strncpy(&s.str[s1.size], s2.str, s2.size);
     return s;
+}
+
+String string_insert(Arena *arena, String s1, String s2, usize idx) {
+    String prefix = string_slice(arena, s1, 0, idx);
+    String postfix = string_slice(arena, s1, idx, s1.size);
+    String new_s = string_concat(arena, prefix, s2);
+    new_s = string_concat(arena, new_s, postfix);
+    return new_s;
 }
 
 bool string_eq(String s1, String s2) {
@@ -286,10 +294,19 @@ void print(String s) {
 void main_cli() {
     Arena arena = init_arena();
 
-    String first = str_to_string(&arena, "Alexander");
-    String last = str_to_string(&arena, "Tebbe");
+    String first = init_string(&arena, "Alexnder");
+
+    first = string_concat(&arena, first, init_string(&arena, " "));
+    first = string_insert(&arena, first, init_string(&arena, "a"), 4);
+
+    String last = init_string(&arena, "Tebbe");
     String name = string_concat(&arena, first, last);
-    assert(string_eq(name, str_to_string(&arena, "AlexanderTebbe")));
+
+    print(name);
+    assert(string_eq(name, init_string(&arena, "Alexander Tebbe")));
+
+    String s = init_string(&arena, "");
+    print(s);
 
     arena_free(&arena);
 }
