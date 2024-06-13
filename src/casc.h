@@ -25,6 +25,7 @@ typedef double f64;
 typedef struct AST AST;
 typedef struct Parser Parser;
 typedef struct Arena Arena;
+typedef struct String String;
 
 //
 // lexer
@@ -245,3 +246,14 @@ Arena init_arena();
 void arena_free(Arena*);
 void *arena_alloc(Arena*, usize);
 
+struct String {
+    char *str;
+    usize size;
+};
+
+String init_string(Arena *arena, char *str);
+String string_slice(Arena *arena, String s, usize start, usize stop);
+String string_concat(Arena *arena, String s1, String s2);
+String string_insert(Arena *arena, String s1, String s2, usize idx);
+bool string_eq(String s1, String s2);
+void print(String s);

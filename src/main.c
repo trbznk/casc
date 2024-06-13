@@ -87,6 +87,61 @@ void *arena_alloc(Arena *arena, usize size) {
     return memory;
 }
 
+String init_string(Arena *arena, char *str) {
+    String s = {0};
+    s.size = strlen(str);
+    printf("s.size=%zu\n", s.size);
+    s.str = arena_alloc(arena, s.size);
+    strncpy(s.str, str, s.size);
+    return s;
+}
+
+String string_slice(Arena *arena, String s, usize start, usize stop) {
+    String new_s = {0};
+    new_s.size = stop-start;
+    new_s.str = arena_alloc(arena, new_s.size);
+    strncpy(new_s.str, &s.str[start], new_s.size);
+    return new_s;
+}
+
+String string_concat(Arena *arena, String s1, String s2) {
+    String s = {0};
+    s.size = s1.size+s2.size;
+    s.str = arena_alloc(arena, s.size);
+    strncpy(s.str, s1.str, s1.size);
+    strncpy(&s.str[s1.size], s2.str, s2.size);
+    return s;
+}
+
+String string_insert(Arena *arena, String s1, String s2, usize idx) {
+    String prefix = string_slice(arena, s1, 0, idx);
+    String postfix = string_slice(arena, s1, idx, s1.size);
+    String new_s = string_concat(arena, prefix, s2);
+    new_s = string_concat(arena, new_s, postfix);
+    return new_s;
+}
+
+bool string_eq(String s1, String s2) {
+    if (s1.size != s2.size) {
+        return false;
+    }
+
+    for (usize i = 0; i < s1.size; i++) {
+        if (s1.str[i] != s2.str[i]) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void print(String s) {
+    for (usize i = 0; i < s.size; i++) {
+        printf("%c", s.str[i]);
+    }
+    printf("\n");
+}
+
 void _test_ast(u32 line_number, char *source, char *test_source) {
     Arena arena = init_arena();
 
@@ -228,90 +283,31 @@ void test() {
     test_ast("sin(4/5)*2-5.2/4", "0.134712");
 
     printf("\n\n");
-}
 
-typedef struct String String;
-struct String {
-    char *str;
-    usize size;
-};
+    {
+        Arena arena = init_arena();
 
-String init_string(Arena *arena, char *str) {
-    String s = {0};
-    s.size = strlen(str);
-    printf("s.size=%zu\n", s.size);
-    s.str = arena_alloc(arena, s.size);
-    strncpy(s.str, str, s.size);
-    return s;
-}
+        String first = init_string(&arena, "Alexnder");
 
-String string_slice(Arena *arena, String s, usize start, usize stop) {
-    String new_s = {0};
-    new_s.size = stop-start;
-    new_s.str = arena_alloc(arena, new_s.size);
-    strncpy(new_s.str, &s.str[start], new_s.size);
-    return new_s;
-}
+        first = string_concat(&arena, first, init_string(&arena, " "));
+        first = string_insert(&arena, first, init_string(&arena, "a"), 4);
 
-String string_concat(Arena *arena, String s1, String s2) {
-    String s = {0};
-    s.size = s1.size+s2.size;
-    s.str = arena_alloc(arena, s.size);
-    strncpy(s.str, s1.str, s1.size);
-    strncpy(&s.str[s1.size], s2.str, s2.size);
-    return s;
-}
+        String last = init_string(&arena, "Tebbe");
+        String name = string_concat(&arena, first, last);
 
-String string_insert(Arena *arena, String s1, String s2, usize idx) {
-    String prefix = string_slice(arena, s1, 0, idx);
-    String postfix = string_slice(arena, s1, idx, s1.size);
-    String new_s = string_concat(arena, prefix, s2);
-    new_s = string_concat(arena, new_s, postfix);
-    return new_s;
-}
+        assert(string_eq(name, init_string(&arena, "Alexander Tebbe")));
 
-bool string_eq(String s1, String s2) {
-    if (s1.size != s2.size) {
-        return false;
+        String empty = init_string(&arena, "");
+        String not_empty = init_string(&arena, "casc");
+        String together = string_concat(&arena, empty, not_empty);
+
+        assert(together.size == 4);
+
+        arena_free(&arena);
     }
-
-    for (usize i = 0; i < s1.size; i++) {
-        if (s1.str[i] != s2.str[i]) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-void print(String s) {
-    for (usize i = 0; i < s.size; i++) {
-        printf("%c", s.str[i]);
-    }
-    printf("\n");
 }
 
 void main_cli() {
-    Arena arena = init_arena();
-
-    String first = init_string(&arena, "Alexnder");
-
-    first = string_concat(&arena, first, init_string(&arena, " "));
-    first = string_insert(&arena, first, init_string(&arena, "a"), 4);
-
-    String last = init_string(&arena, "Tebbe");
-    String name = string_concat(&arena, first, last);
-
-    print(name);
-    assert(string_eq(name, init_string(&arena, "Alexander Tebbe")));
-
-    String s = init_string(&arena, "");
-    print(s);
-
-    arena_free(&arena);
-}
-
-void main_cli1() {
     Arena arena = init_arena();
 
     Lexer lexer = {0};
