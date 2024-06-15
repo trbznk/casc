@@ -16,20 +16,19 @@ const Color COLOR_POMP_AND_POWER = {129, 110, 148, 255};
 const Color COLOR_CHESTNUT = {162, 73, 54, 255};
 
 void init_gui() {
-    char* window_title = "casc";
+    String window_title = init_string("casc");
     i32 screen_width = 800;
     i32 screen_height = 600;
-    i32 cursor_position = 0;
+    usize cursor_position = 0;
 
     Arena gui_arena = init_arena();
 
-    char cell_input_buffer[CELL_INPUT_BUFFER_SIZE];
+    String cell_input_buffer = init_string("");
 
     // dont like this @todo
-    char *cell_output_buffer = NULL;
-    cell_input_buffer[0] = '\0';
+    String cell_output_buffer = init_string("");
 
-    InitWindow(screen_width, screen_height, window_title);
+    InitWindow(screen_width, screen_height, window_title.str);
 
     // Font font = LoadFontEx("./fonts/monaspace-v1.101/fonts/otf/MonaspaceNeon-Regular.otf", 96, 0, 0);
     // Font font = LoadFontEx("./fonts/PkgTTF-Iosevka-30/Iosevka-Regular.ttf", 96, 0, 0);
@@ -65,22 +64,27 @@ void init_gui() {
         }
         
         if (c != 0) {
-            assert(strlen(cell_input_buffer) + 1 < CELL_INPUT_BUFFER_SIZE);
-            memmove(
-                &cell_input_buffer[cursor_position+1],
-                &cell_input_buffer[cursor_position],
-                strlen(cell_input_buffer)-cursor_position+1 // we need to add 1 here, because it's a null terminated string for now
-            );
-            cell_input_buffer[cursor_position] = c;
+            cell_input_buffer = string_insert(&gui_arena, cell_input_buffer, char_to_string(&gui_arena, c), cursor_position);
+            // memmove(
+            //     &cell_input_buffer[cursor_position+1],
+            //     &cell_input_buffer[cursor_position],
+            //     strlen(cell_input_buffer)-cursor_position+1 // we need to add 1 here, because it's a null terminated string for now
+            // );
+            // cell_input_buffer[cursor_position] = c;
             cursor_position++;
         } else if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) {
             if (cursor_position > 0) {
                 i32 idx_to_delete = cursor_position-1;
-                memmove(
-                    &cell_input_buffer[idx_to_delete],
-                    &cell_input_buffer[idx_to_delete+1],
-                    strlen(cell_input_buffer)-cursor_position+1 // we need to add 1 here, because it's a null terminated string for now
+                cell_input_buffer = string_concat(
+                    &gui_arena,
+                    string_slice(&gui_arena, cell_input_buffer, 0, idx_to_delete),
+                    string_slice(&gui_arena, cell_input_buffer, idx_to_delete+1, cell_input_buffer.size)
                 );
+                // memmove(
+                //     &cell_input_buffer[idx_to_delete],
+                //     &cell_input_buffer[idx_to_delete+1],
+                //     strlen(cell_input_buffer)-cursor_position+1 // we need to add 1 here, because it's a null terminated string for now
+                // );
                 cursor_position--;
             }
         } else if (IsKeyPressed(KEY_LEFT)) {
@@ -88,7 +92,7 @@ void init_gui() {
                 cursor_position -= 1;
             }
         } else if (IsKeyPressed(KEY_RIGHT)) {
-            if (cursor_position < (int)strlen(cell_input_buffer)) {
+            if (cursor_position < cell_input_buffer.size) {
                 cursor_position += 1;
             }
         } else if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_ENTER)) {
@@ -126,7 +130,7 @@ void init_gui() {
 #endif
 
         Vector2 input_text_pos = { padding.x, padding.y, };
-        DrawTextEx(font, cell_input_buffer, input_text_pos, font_size.y, 0, COLOR_DARK_GREEN);
+        DrawTextEx(font, cell_input_buffer.str, input_text_pos, font_size.y, 0, COLOR_DARK_GREEN);
 
         {
             i32 x = padding.x + font_size.x * cursor_position;
@@ -136,11 +140,11 @@ void init_gui() {
 
         DrawLine(0, line_height, screen_width, line_height, COLOR_MOONSTONE);
 
-        if (cell_output_buffer != NULL) {
-            printf("strlen(cell_output_buffer)=%lu\n", strlen(cell_output_buffer));
-            if (strlen(cell_output_buffer) > 0) {
+        if (cell_output_buffer.size > 0) {
+            // printf("strlen(cell_output_buffer)=%lu\n", strlen(cell_output_buffer));
+            if (cell_output_buffer.size > 0) {
                 Vector2 output_text_pos = { padding.x, line_height + padding.y, };
-                DrawTextEx(font, cell_output_buffer, output_text_pos, font_size.y, 2, COLOR_DARK_GREEN);
+                DrawTextEx(font, cell_output_buffer.str, output_text_pos, font_size.y, 2, COLOR_DARK_GREEN);
             }
         }
 

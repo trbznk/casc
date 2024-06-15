@@ -5,6 +5,7 @@
 
 #include "casc.h"
 
+// TODO: return string
 const char* op_type_to_debug_string(OpType type) {
     switch(type) {
         case OP_ADD: return "Add";
@@ -18,6 +19,7 @@ const char* op_type_to_debug_string(OpType type) {
     }
 }
 
+// TODO: return string
 const char* op_type_to_string(OpType type) {
     switch (type) {
         case OP_ADD:
@@ -31,6 +33,7 @@ const char* op_type_to_string(OpType type) {
     }
 }
 
+// TODO: return string
 const char* ast_type_to_debug_string(ASTType type) {
     switch (type) {
         case AST_INTEGER: return "Integer";
@@ -90,12 +93,10 @@ AST* init_ast_real(Arena* arena, f64 value) {
     return node;
 }
 
-AST* init_ast_symbol(Arena* arena, char *name) {
+AST* init_ast_symbol(Arena* arena, String name) {
     AST *node = arena_alloc(arena, sizeof(AST));
     node->type = AST_SYMBOL;
-    node->symbol.name = arena_alloc(arena, strlen(name)+1);
-    strcpy(node->symbol.name, name);
-    assert(strlen(node->symbol.name) == strlen(name));
+    node->symbol.name = name;
     return node;
 }
 
@@ -116,10 +117,10 @@ AST* init_ast_unaryop(Arena* arena, AST* operand, OpType op) {
     return node;
 }
 
-AST* init_ast_call(Arena* arena, char *name, ASTArray args) {
+AST* init_ast_call(Arena* arena, String name, ASTArray args) {
     AST *node = arena_alloc(arena, sizeof(AST));
     node->type = AST_CALL;
-    strcpy(node->func_call.name, name);
+    node->func_call.name = name;
     node->func_call.args = args;
     return node;
 }

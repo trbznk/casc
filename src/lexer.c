@@ -17,16 +17,16 @@ const char *BUILTIN_CONSTANTS[] = {
 };
 const usize BUILTIN_CONSTANTS_COUNT = sizeof(BUILTIN_CONSTANTS) / sizeof(BUILTIN_CONSTANTS[0]);
 
-bool is_builtin_function(char *s) {
+bool is_builtin_function(String s) {
     for (usize i = 0; i < BUILTIN_FUNCTIONS_COUNT; i++) {
-        if (!strcmp(s, BUILTIN_FUNCTIONS[i])) return true;
-    }  
+        if (!strcmp(s.str, BUILTIN_FUNCTIONS[i])) return true;
+    }
     return false;
 }
 
-bool is_builtin_constant(char *s) {
+bool is_builtin_constant(String s) {
     for (usize i = 0; i < BUILTIN_CONSTANTS_COUNT; i++) {
-        if (!strcmp(s, BUILTIN_CONSTANTS[i])) return true;
+        if (!strcmp(s.str, BUILTIN_CONSTANTS[i])) return true;
     }  
     return false;
 }
@@ -35,49 +35,49 @@ void lexer_print_tokens(Lexer *lexer) {
     Token token;
     do {
         token = lexer_next_token(lexer);
-        printf("%s('%s') ", token_type_to_string(token.type), token.text);
+        printf("%s('%s') ", token_type_to_string(token.type), token.text.str);
     } while (token.type != TOKEN_EOF);
     printf("\n");
 }
 
 inline char lexer_current_char(Lexer *lexer) {
-    return lexer->source[lexer->pos];
+    return lexer->source.str[lexer->pos];
 }
 
 Token lexer_next_token(Lexer *lexer) {
     Token token = {0};
     assert(!token.contains_dot);
 
-    if (lexer->pos == strlen(lexer->source)) {
+    if (lexer->pos == lexer->source.size) {
         token.type = TOKEN_EOF;
         return token;
     }
 
     if (isdigit(lexer_current_char(lexer))) {
-        char buffer[64] = "";
+        String buffer = init_string("");
         while (isdigit(lexer_current_char(lexer)) || lexer_current_char(lexer) == '.') {
             char current_char = lexer_current_char(lexer);
-            strncat(buffer, &current_char, 1);
+            buffer = string_concat(lexer->arena, buffer, char_to_string(lexer->arena, current_char));
             lexer->pos += 1;
         }
         token.type = TOKEN_NUMBER;
 
         u32 dots_count = 0;
-        for (usize i = 0; i < strlen(buffer); i++) {
-            if (buffer[i] == '.') {
+        for (usize i = 0; i < buffer.size; i++) {
+            if (buffer.str[i] == '.') {
                 dots_count += 1;
                 token.contains_dot = true;
             }
         }
         assert(dots_count < 2);
-        assert(buffer[0] != '.');
-        assert(buffer[strlen(buffer)-1] != '.');
+        assert(buffer.str[0] != '.');
+        assert(buffer.str[buffer.size-1] != '.');
 
-        strcpy(token.text, buffer);
+        token.text = buffer;
         return token;
     } else if (isalpha(lexer_current_char(lexer))) {
         // collect alphanumeric chars into the buffer
-        char buffer[64] = "";
+        String buffer = init_string("");
         usize first = lexer->pos;
         while (
             isalpha(lexer_current_char(lexer)) ||
@@ -85,71 +85,65 @@ Token lexer_next_token(Lexer *lexer) {
             isdigit(lexer_current_char(lexer))))
         ) {
             char current_char = lexer_current_char(lexer);
-            strncat(buffer, &current_char, 1);
+            buffer = string_concat(lexer->arena, buffer, char_to_string(lexer->arena, current_char));
             lexer->pos += 1;
         }
 
         if (is_builtin_function(buffer) || is_builtin_constant(buffer)) {
             token.type = TOKEN_IDENTIFIER;
-            strcpy(token.text, buffer);
+            token.text = buffer;
             return token;
         // when not, every char becomes a seperate identifier token
         } else {
             lexer->pos = first;
             token.type = TOKEN_IDENTIFIER;
             char current_char = lexer_current_char(lexer);
-            strncpy(token.text, &current_char, 1);
-
+            token.text = char_to_string(lexer->arena, current_char);
             lexer->pos += 1;
             return token;
         }
     } else if (lexer_current_char(lexer) == '+') {
         token.type = TOKEN_PLUS;
-        token.text[0] = lexer_current_char(lexer);
+        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (lexer_current_char(lexer) == '-') {
         token.type = TOKEN_MINUS;
-        token.text[0] = lexer_current_char(lexer);
+        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (lexer_current_char(lexer) == '*') {
         token.type = TOKEN_STAR;
-        token.text[0] = lexer_current_char(lexer);
+        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (lexer_current_char(lexer) == '/') {
         token.type = TOKEN_SLASH;
-        token.text[0] = lexer_current_char(lexer);
+        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (lexer_current_char(lexer) == '^') {
         token.type = TOKEN_CARET;
-        token.text[0] = lexer_current_char(lexer);
+        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (lexer_current_char(lexer) == '(') {
         token.type = TOKEN_L_PAREN;
-        token.text[0] = lexer_current_char(lexer);
+        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (lexer_current_char(lexer) == ')') {
         token.type = TOKEN_R_PAREN;
-        token.text[0] = lexer_current_char(lexer);
+        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (isspace(lexer_current_char(lexer))) {
         // ignore spaces for now
         lexer->pos += 1;
         return lexer_next_token(lexer);
-    } else if (lexer_current_char(lexer) == '#') {
-        token.type = TOKEN_HASH;
-        token.text[0] = lexer_current_char(lexer);
-        lexer->pos += 1;
-        return token;
     } else if (lexer_current_char(lexer) == ',') {
         token.type = TOKEN_COMMA;
-        token.text[0] = lexer_current_char(lexer);
+        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else {

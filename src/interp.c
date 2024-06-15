@@ -20,12 +20,12 @@ bool ast_match(AST* left, AST* right) {
             case AST_REAL:
                 return left->real.value == right->real.value;
             case AST_SYMBOL:
-                return !strcmp(left->symbol.name, right->symbol.name);
+                return string_eq(left->symbol.name, right->symbol.name);
             case AST_BINOP:
                 return ast_match(left->binop.left, right->binop.left) && ast_match(left->binop.right, right->binop.right);
             case AST_CALL: {
                 if (
-                    !strcmp(left->func_call.name, right->func_call.name) &&
+                    string_eq(left->func_call.name, right->func_call.name) &&
                     left->func_call.args.size == right->func_call.args.size
                 ) {
                     for (usize i = 0; i < left->func_call.args.size; i++) {
@@ -71,48 +71,50 @@ bool ast_match_type(AST *left, AST *right) {
     return false;
 }
 
-char *ast_to_debug_string(Arena *arena, AST* node) {
-    char *output = arena_alloc(arena, 1024);
+String ast_to_debug_string(Arena *arena, AST* node) {
+    String output = {0};
+    output.str = arena_alloc(arena, 1024);
     switch (node->type) {
-        case AST_INTEGER: sprintf(output, "%s(%lld)", ast_type_to_debug_string(node->type), node->integer.value); break;
-        case AST_REAL: sprintf(output, "%s(%f)", ast_type_to_debug_string(node->type), node->real.value); break;
-        case AST_SYMBOL: sprintf(output, "%s(%s)", ast_type_to_debug_string(node->type), node->symbol.name); break;
-        case AST_BINOP: sprintf(output, "%s(%s, %s)", op_type_to_debug_string(node->binop.op), ast_to_debug_string(arena, node->binop.left), ast_to_debug_string(arena, node->binop.right)); break;
-        case AST_UNARYOP: sprintf(output, "%s(%s)", op_type_to_debug_string(node->unaryop.op), ast_to_debug_string(arena, node->unaryop.operand)); break;
+        case AST_INTEGER: sprintf(output.str, "%s(%lld)", ast_type_to_debug_string(node->type), node->integer.value); break;
+        case AST_REAL: sprintf(output.str, "%s(%f)", ast_type_to_debug_string(node->type), node->real.value); break;
+        case AST_SYMBOL: sprintf(output.str, "%s(%s)", ast_type_to_debug_string(node->type), node->symbol.name.str); break;
+        case AST_BINOP: sprintf(output.str, "%s(%s, %s)", op_type_to_debug_string(node->binop.op), ast_to_debug_string(arena, node->binop.left).str, ast_to_debug_string(arena, node->binop.right).str); break;
+        case AST_UNARYOP: sprintf(output.str, "%s(%s)", op_type_to_debug_string(node->unaryop.op), ast_to_debug_string(arena, node->unaryop.operand).str); break;
         // args to debug string @todo
         case AST_CALL: {
             if (node->func_call.args.size == 1) {
-                sprintf(output, "FuncCall(%s, %s)", node->func_call.name, ast_to_debug_string(arena, node->func_call.args.data[0])); break;
+                sprintf(output.str, "FuncCall(%s, %s)", node->func_call.name.str, ast_to_debug_string(arena, node->func_call.args.data[0]).str); break;
             } else {
                 // multiple args to string @todo
-                sprintf(output, "FuncCall(%s, args)", node->func_call.name); break;
+                sprintf(output.str, "FuncCall(%s, args)", node->func_call.name.str); break;
             }
         }
-        case AST_EMPTY: sprintf(output, "Empty()"); break;
+        case AST_EMPTY: sprintf(output.str, "Empty()"); break;
         default: fprintf(stderr, "ERROR: Cannot do 'ast_to_debug_string' because node type '%s' is not implemented.\n", ast_type_to_debug_string(node->type)); exit(1);
     }
     return output;
 }
 
-char *_ast_to_string(Arena *arena, AST* node, uint8_t op_precedence) {
-    char *output = arena_alloc(arena, 1024);
+String _ast_to_string(Arena *arena, AST* node, u8 op_precedence) {
+    String output = {0};
+    output.str = arena_alloc(arena, 1024);
     switch (node->type) {
-        case AST_INTEGER: sprintf(output, "%lld", node->integer.value); break;
-        case AST_REAL: sprintf(output, "%f", node->real.value); break;
+        case AST_INTEGER: sprintf(output.str, "%lld", node->integer.value); break;
+        case AST_REAL: sprintf(output.str, "%f", node->real.value); break;
         case AST_SYMBOL:
-            sprintf(output, "%s", node->symbol.name); break;
+            sprintf(output.str, "%s", node->symbol.name.str); break;
         case AST_BINOP: {
 
             uint8_t current_op_precedence = op_type_precedence(node->binop.op);
 
-            char *left_string = _ast_to_string(arena, node->binop.left, current_op_precedence);
-            char *right_string = _ast_to_string(arena, node->binop.right, current_op_precedence);
+            String left_string = _ast_to_string(arena, node->binop.left, current_op_precedence);
+            String right_string = _ast_to_string(arena, node->binop.right, current_op_precedence);
             const char *op_type_string = op_type_to_string(node->binop.op);
 
             if (current_op_precedence < op_precedence) {
-                sprintf(output, "(%s%s%s)", left_string, op_type_string, right_string);
+                sprintf(output.str, "(%s%s%s)", left_string.str, op_type_string, right_string.str);
             } else {
-                sprintf(output, "%s%s%s", left_string, op_type_string, right_string);
+                sprintf(output.str, "%s%s%s", left_string.str, op_type_string, right_string.str);
             }
 
             break;
@@ -120,22 +122,23 @@ char *_ast_to_string(Arena *arena, AST* node, uint8_t op_precedence) {
         case AST_UNARYOP: {
             uint8_t current_op_precedence = op_type_precedence(node->binop.op);
 
-            char *expr_string = _ast_to_string(arena, node->unaryop.operand, op_precedence);
+            String expr_string = _ast_to_string(arena, node->unaryop.operand, op_precedence);
             const char *op_type_string = op_type_to_string(node->unaryop.op);
 
             if (current_op_precedence < op_precedence) {
-                sprintf(output, "(%s%s)", op_type_string, expr_string); break;
+                sprintf(output.str, "(%s%s)", op_type_string, expr_string.str); break;
             } else {
-                sprintf(output, "%s%s", op_type_string, expr_string); break;
+                sprintf(output.str, "%s%s", op_type_string, expr_string.str); break;
             }
             
         }
         case AST_CALL: {
             if (node->func_call.args.size == 1) {
-                sprintf(output, "%s(%s)", node->func_call.name, _ast_to_string(arena, node->func_call.args.data[0], op_precedence)); break;
+                String arg_string = _ast_to_string(arena, node->func_call.args.data[0], op_precedence);
+                sprintf(output.str, "%s(%s)", node->func_call.name.str, arg_string.str); break;
             } else {
                 // multiple args to string @todo
-                sprintf(output, "%s(args)", node->func_call.name); break;
+                sprintf(output.str, "%s(args)", node->func_call.name.str); break;
             }
         }
         case AST_EMPTY: break;
@@ -353,7 +356,7 @@ AST* diff(Interp *ip, AST *expr, AST *var) {
 }
 
 AST *interp_sin(Interp *ip, AST* x) {
-    if (ast_match(x, SYMBOL("pi"))) {
+    if (ast_match(x, SYMBOL(init_string("pi")))) {
         return INTEGER(0);
     } else if (ast_is_numeric(x)) {
         f64 value = ast_to_f64(x);
@@ -362,15 +365,15 @@ AST *interp_sin(Interp *ip, AST* x) {
     
     ASTArray args = {0};
     ast_array_append(ip->arena, &args, x);
-    return CALL("sin", args);
+    return CALL(init_string("sin"), args);
 }
 
 AST *interp_cos(Interp *ip, AST* x) {    
     if (ast_match(x, INTEGER(0))) {
         return INTEGER(1);
-    } else if (ast_match(x, DIV(SYMBOL("pi"), INTEGER(2)))) {
+    } else if (ast_match(x, DIV(SYMBOL(init_string("pi")), INTEGER(2)))) {
         return INTEGER(0);
-    } else if (ast_match(x, SYMBOL("pi"))) {
+    } else if (ast_match(x, SYMBOL(init_string("pi")))) {
         return INTEGER(-1);
     } else if (ast_is_numeric(x)) {
         f64 value = ast_to_f64(x);
@@ -379,7 +382,7 @@ AST *interp_cos(Interp *ip, AST* x) {
 
     ASTArray args = {0};
     ast_array_append(ip->arena, &args, x);
-    return CALL("cos", args);
+    return CALL(init_string("cos"), args);
 }
 
 AST *interp_tan(Interp *ip, AST* x) {
@@ -390,7 +393,7 @@ AST *interp_tan(Interp *ip, AST* x) {
     
     ASTArray args = {0};
     ast_array_append(ip->arena, &args, x);
-    return CALL("tan", args);
+    return CALL(init_string("tan"), args);
 }
 
 AST *interp_log(Interp *ip, AST *y, AST *b) {
@@ -408,16 +411,16 @@ AST *interp_log(Interp *ip, AST *y, AST *b) {
     ASTArray args = {0};
     ast_array_append(ip->arena, &args, y);
     ast_array_append(ip->arena, &args, b);
-    return CALL("log", args);
+    return CALL(init_string("log"), args);
 }
 
-AST* interp_call(Interp *ip, char *name, ASTArray args) {
+AST* interp_call(Interp *ip, String name, ASTArray args) {
 
     for (usize i = 0; i < args.size; i++) {
         args.data[i] = interp(ip, args.data[i]);
     }
 
-    if (!strcmp(name, "sqrt") && args.data[0]->type == AST_INTEGER) {
+    if (string_eq(name, init_string("sqrt")) && args.data[0]->type == AST_INTEGER) {
         double result = sqrt((double)args.data[0]->integer.value);
 
         if (fmod((double)args.data[0]->integer.value, result) == 0.0) {
@@ -436,25 +439,25 @@ AST* interp_call(Interp *ip, char *name, ASTArray args) {
                 return MUL(INTEGER((i64)sqrt_of_q), CALL(name, new_args));
             }
         }
-    } else if (!strcmp(name, "ln")) {
-        if (ast_match(args.data[0], SYMBOL("e"))) {
+    } else if (string_eq(name, init_string("ln"))) {
+        if (ast_match(args.data[0], SYMBOL(init_string("e")))) {
             return INTEGER(1);
         } else if (ast_match(args.data[0], INTEGER(1))) {
             return INTEGER(0);
         }
-    } else if (!strcmp(name, "log")) {
+    } else if (string_eq(name, init_string("log"))) {
         assert(args.size == 2);
         return interp_log(ip, args.data[0], args.data[1]);
-    } else if (!strcmp(name, "sin")) {
+    } else if (string_eq(name, init_string("sin"))) {
         assert(args.size == 1);
         return interp_sin(ip, args.data[0]);
-    } else if (!strcmp(name, "cos")) {
+    } else if (string_eq(name, init_string("cos"))) {
         assert(args.size == 1);
         return interp_cos(ip, args.data[0]);
-    } else if (!strcmp(name, "tan")) {
+    } else if (string_eq(name, init_string("tan"))) {
         assert(args.size == 1);
         return interp_tan(ip, args.data[0]);
-    } else if (!strcmp(name, "diff")) {
+    } else if (string_eq(name, init_string("diff"))) {
         AST* diff_var;
 
         if (args.size == 1) {

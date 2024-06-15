@@ -3,6 +3,15 @@
 #include <stdlib.h>
 
 //
+// forward declarations
+//
+
+typedef struct AST AST;
+typedef struct Parser Parser;
+typedef struct Arena Arena;
+typedef struct String String;
+
+//
 // Basic Types
 //
 
@@ -18,14 +27,19 @@ typedef size_t usize;
 typedef float f32;
 typedef double f64;
 
-//
-// forward declarations
-//
+struct String {
+    char *str;
+    usize size;
+};
 
-typedef struct AST AST;
-typedef struct Parser Parser;
-typedef struct Arena Arena;
-typedef struct String String;
+String init_string(const char *str);
+String char_to_string(Arena *arena, char c);
+String string_slice(Arena *arena, String s, usize start, usize stop);
+String string_concat(Arena *arena, String s1, String s2);
+String string_insert(Arena *arena, String s1, String s2, usize idx);
+String string_insert_char(Arena *arena, String s1, char c, usize idx);
+bool string_eq(String s1, String s2);
+void print(String s);
 
 //
 // lexer
@@ -61,15 +75,17 @@ typedef enum {
 
 typedef struct {
     TokenType type;
-    char text[64];
+    String text;
     
+    // TODO: replace this and the occurences with string method
+    //       string_contains
     bool contains_dot;
 } Token;
 
 typedef struct Lexer Lexer;
 struct Lexer {
     Arena *arena;
-    char* source;
+    String source;
     usize pos;
 };
 
@@ -80,8 +96,8 @@ void lexer_print_tokens(Lexer*);
 
 const char* token_type_to_string(TokenType);
 
-bool is_builtin_function(char*);
-bool is_builtin_constant(char*);
+bool is_builtin_function(String);
+bool is_builtin_constant(String);
 
 //
 // ast
@@ -145,8 +161,7 @@ struct AST {
         } real;
 
         struct {
-            // fixed length? @todo
-            char *name;
+            String name;
         } symbol;
 
         struct {
@@ -161,7 +176,7 @@ struct AST {
         } unaryop;
 
         struct {
-            char name[64];
+            String name;
             ASTArray args;
         } func_call;
 
@@ -171,10 +186,10 @@ struct AST {
 
 AST* init_ast_integer(Arena*, i64);
 AST* init_ast_real(Arena*, f64);
-AST* init_ast_symbol(Arena*, char*);
+AST* init_ast_symbol(Arena*, String);
 AST* init_ast_binop(Arena*, AST*, AST*, OpType);
 AST* init_ast_unaryop(Arena*, AST*, OpType);
-AST* init_ast_call(Arena*, char*, ASTArray);
+AST* init_ast_call(Arena*, String, ASTArray);
 AST* init_ast_empty(Arena*);
 
 void ast_array_append(Arena*, ASTArray*, AST*);
@@ -211,14 +226,12 @@ typedef struct {
 AST *interp(Interp*, AST*);
 AST *interp_binop_pow(Interp*, AST*, AST*);
 
-AST* interp_from_string(Interp*, char*);
-
 bool ast_match(AST*, AST*);
 bool ast_match_type(AST*, AST*);
 
-char *_ast_to_string(Arena*, AST*, u8);
+String _ast_to_string(Arena*, AST*, u8);
 #define ast_to_string(arena, node) _ast_to_string(arena, node, 0)
-char *ast_to_debug_string(Arena*, AST*);
+String ast_to_debug_string(Arena*, AST*);
 
 //
 // gui
@@ -245,15 +258,3 @@ struct Arena {
 Arena init_arena();
 void arena_free(Arena*);
 void *arena_alloc(Arena*, usize);
-
-struct String {
-    char *str;
-    usize size;
-};
-
-String init_string(Arena *arena, char *str);
-String string_slice(Arena *arena, String s, usize start, usize stop);
-String string_concat(Arena *arena, String s1, String s2);
-String string_insert(Arena *arena, String s1, String s2, usize idx);
-bool string_eq(String s1, String s2);
-void print(String s);

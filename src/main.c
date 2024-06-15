@@ -9,6 +9,7 @@
 #include "casc.h"
 
 #define ARENA_SIZE 1024
+#define TEST_EARLY_STOP true
 
 Arena init_arena() {
     Arena arena = {0};
@@ -37,6 +38,13 @@ void arena_reset(Arena *arena) {
 }
 
 void *arena_alloc(Arena *arena, usize size) {
+
+    // bring size up to a power of 2 to have proper alignment
+    usize padding = 64;
+    size = size+(padding-size%padding);
+    assert(size > 0);
+    assert(size % 32 == 0);
+
 # if 0
     static bool has_seen_arena_alloc_malloc_warning = false;
     if (!has_seen_arena_alloc_malloc_warning) {
@@ -49,7 +57,7 @@ void *arena_alloc(Arena *arena, usize size) {
     usize free_capacity = arena->size - arena->offset;
 
 #if 0
-    printf("size=%zu, free_capacity=%zu, reallocs_count=%u\n", size, free_capacity, arena->reallocs_count);
+    printf("size=%zu, arena->size=%zu, free_capacity=%zu, reallocs_count=%u\n", size, arena->size, free_capacity, arena->reallocs_count);
 #endif
 
     if (free_capacity <= size) {
@@ -87,20 +95,28 @@ void *arena_alloc(Arena *arena, usize size) {
     return memory;
 }
 
-String init_string(Arena *arena, char *str) {
+String init_string(const char *str) {
     String s = {0};
     s.size = strlen(str);
-    printf("s.size=%zu\n", s.size);
-    s.str = arena_alloc(arena, s.size);
-    strncpy(s.str, str, s.size);
+    s.str = (char*)str;
+    return s;
+}
+
+String char_to_string(Arena *arena, char c) {
+    String s = {0};
+    s.size = 1;
+    s.str = arena_alloc(arena, 2);
+    s.str[0] = c;
+    s.str[1] = '\0';
     return s;
 }
 
 String string_slice(Arena *arena, String s, usize start, usize stop) {
     String new_s = {0};
     new_s.size = stop-start;
-    new_s.str = arena_alloc(arena, new_s.size);
+    new_s.str = arena_alloc(arena, new_s.size+1);
     strncpy(new_s.str, &s.str[start], new_s.size);
+    new_s.str[new_s.size] = '\0';
     return new_s;
 }
 
@@ -110,6 +126,7 @@ String string_concat(Arena *arena, String s1, String s2) {
     s.str = arena_alloc(arena, s.size);
     strncpy(s.str, s1.str, s1.size);
     strncpy(&s.str[s1.size], s2.str, s2.size);
+    s.str[s.size] = '\0';
     return s;
 }
 
@@ -142,7 +159,7 @@ void print(String s) {
     printf("\n");
 }
 
-void _test_ast(u32 line_number, char *source, char *test_source) {
+void _test_ast(u32 line_number, String source, String test_source) {
     Arena arena = init_arena();
 
     Lexer lexer = {0};
@@ -157,13 +174,16 @@ void _test_ast(u32 line_number, char *source, char *test_source) {
 
     printf("test:%d ... ", line_number);
 
-    char *output_string = ast_to_string(ip.arena, output);
-    if (strcmp(output_string, test_source) != 0) {
-        printf("FAILED\n");        
-        printf("'%s'\n", output_string);
+    String output_string = ast_to_string(ip.arena, output);
+    if (string_eq(output_string, test_source) != 0) {
+        printf("FAILED\n");
+        print(output_string);
         printf("!=\n");
-        printf("'%s'\n", test_source);
-        // exit(1);
+        print(test_source);
+        
+        if (TEST_EARLY_STOP) {
+            exit(1);
+        }
     } else { 
         printf("OK\n");
     }
@@ -173,7 +193,7 @@ void _test_ast(u32 line_number, char *source, char *test_source) {
 
 void test() {
 
-    #define test_ast(source, test_source) _test_ast(__LINE__, source, test_source)
+    #define test_ast(source, test_source) _test_ast(__LINE__, init_string(source), init_string(test_source))
 
     // ruslanspivak interpreter tutorial tests
     test_ast("27 + 3", "30");
@@ -285,20 +305,21 @@ void test() {
     printf("\n\n");
 
     {
+        // test strings
         Arena arena = init_arena();
 
-        String first = init_string(&arena, "Alexnder");
+        String first = init_string("Alexnder");
 
-        first = string_concat(&arena, first, init_string(&arena, " "));
-        first = string_insert(&arena, first, init_string(&arena, "a"), 4);
+        first = string_concat(&arena, first, init_string(" "));
+        first = string_insert(&arena, first, init_string("a"), 4);
 
-        String last = init_string(&arena, "Tebbe");
+        String last = init_string("Tebbe");
         String name = string_concat(&arena, first, last);
 
-        assert(string_eq(name, init_string(&arena, "Alexander Tebbe")));
+        assert(string_eq(name, init_string("Alexander Tebbe")));
 
-        String empty = init_string(&arena, "");
-        String not_empty = init_string(&arena, "casc");
+        String empty = init_string("");
+        String not_empty = init_string("casc");
         String together = string_concat(&arena, empty, not_empty);
 
         assert(together.size == 4);
@@ -311,7 +332,9 @@ void main_cli() {
     Arena arena = init_arena();
 
     Lexer lexer = {0};
-    lexer.source = "1/8 * (-4-2*4/3-1)";
+    lexer.source = init_string("5 - - - + - (3 + 4) - +2");
+    printf("source:\n");
+    print(lexer.source);
     lexer.arena = &arena;
 
     Interp ip = {0};
@@ -319,13 +342,16 @@ void main_cli() {
 
     AST* output = parse(&lexer);
     printf("parsed:\n");
-    printf("%s\n", ast_to_debug_string(&arena, output));
+    print(ast_to_debug_string(&arena, output));
 
     output = interp(&ip, output);
 
     printf("output:\n");
-    printf("%s\n", ast_to_debug_string(&arena, output));
-    printf("%s\n", ast_to_string(&arena, output));
+    print(ast_to_debug_string(&arena, output));
+    print(ast_to_string(&arena, output));
+
+    printf("info:\n");
+    printf("arena.size=%zu\n", arena.size);
 
     arena_free(&arena);
 }

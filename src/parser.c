@@ -22,9 +22,9 @@ AST *parse_exp(Lexer *lexer) {
         case TOKEN_NUMBER:
             parser_eat(lexer, TOKEN_NUMBER);
             if (token.contains_dot) {
-                return init_ast_real(lexer->arena, strtod(token.text, NULL));
+                return init_ast_real(lexer->arena, strtod(token.text.str, NULL));
             } else {
-                return init_ast_integer(lexer->arena, atoi(token.text));
+                return init_ast_integer(lexer->arena, atoi(token.text.str));
             }
         case TOKEN_IDENTIFIER:
             if (is_builtin_function(token.text)) {

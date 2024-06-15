@@ -1,4 +1,6 @@
 TODO:
+- init_string to only accept const chars (because its mostly used in this way)
+- memset 0 when initialize the arena (but do we need this really)
 
 arena allocator
 - malloc one fixed-big chunk of memory with malloc
