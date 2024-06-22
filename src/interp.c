@@ -75,12 +75,30 @@ String ast_to_debug_string(Arena *arena, AST* node) {
     String output = {0};
     output.str = arena_alloc(arena, 1024);
     switch (node->type) {
-        case AST_INTEGER: sprintf(output.str, "%s(%lld)", ast_type_to_debug_string(node->type), node->integer.value); break;
-        case AST_REAL: sprintf(output.str, "%s(%f)", ast_type_to_debug_string(node->type), node->real.value); break;
-        case AST_SYMBOL: sprintf(output.str, "%s(%s)", ast_type_to_debug_string(node->type), node->symbol.name.str); break;
-        case AST_BINOP: sprintf(output.str, "%s(%s, %s)", op_type_to_debug_string(node->binop.op), ast_to_debug_string(arena, node->binop.left).str, ast_to_debug_string(arena, node->binop.right).str); break;
+
+        case AST_INTEGER:
+            sprintf(output.str, "%s(%lld)", ast_type_to_debug_string(node->type), node->integer.value);
+            break;
+        
+        case AST_REAL:
+            sprintf(output.str, "%s(%f)", ast_type_to_debug_string(node->type), node->real.value);
+            break;
+        
+        case AST_SYMBOL:
+            sprintf(output.str, "%s(%s)", ast_type_to_debug_string(node->type), node->symbol.name.str);
+            break;
+        
+        case AST_BINOP: {
+            const char *op_string = op_type_to_debug_string(node->binop.op);
+            String left_string = ast_to_debug_string(arena, node->binop.left);
+            String right_string = ast_to_debug_string(arena, node->binop.right);
+            sprintf(output.str, "%s(%s, %s)", op_string, left_string.str, right_string.str);
+            break;
+        }
+        
         case AST_UNARYOP: sprintf(output.str, "%s(%s)", op_type_to_debug_string(node->unaryop.op), ast_to_debug_string(arena, node->unaryop.operand).str); break;
-        // args to debug string @todo
+        
+        // TODO: args to debug string
         case AST_CALL: {
             if (node->func_call.args.size == 1) {
                 sprintf(output.str, "FuncCall(%s, %s)", node->func_call.name.str, ast_to_debug_string(arena, node->func_call.args.data[0]).str); break;
@@ -89,20 +107,32 @@ String ast_to_debug_string(Arena *arena, AST* node) {
                 sprintf(output.str, "FuncCall(%s, args)", node->func_call.name.str); break;
             }
         }
+
         case AST_EMPTY: sprintf(output.str, "Empty()"); break;
+        
         default: fprintf(stderr, "ERROR: Cannot do 'ast_to_debug_string' because node type '%s' is not implemented.\n", ast_type_to_debug_string(node->type)); exit(1);
+    
     }
     return output;
 }
 
 String _ast_to_string(Arena *arena, AST* node, u8 op_precedence) {
+    // TODO: The use of String in here is very hacky and should be changed in the future.
+    //       One of the problems here is that directly writing and accessing the memory
+    //       in output.str doesn't affect the size. So without the hacks, the size of the
+    //       result string will be 0 in the end.
+
     String output = {0};
     output.str = arena_alloc(arena, 1024);
     switch (node->type) {
+
         case AST_INTEGER: sprintf(output.str, "%lld", node->integer.value); break;
+        
         case AST_REAL: sprintf(output.str, "%f", node->real.value); break;
+        
         case AST_SYMBOL:
             sprintf(output.str, "%s", node->symbol.name.str); break;
+        
         case AST_BINOP: {
 
             uint8_t current_op_precedence = op_type_precedence(node->binop.op);
@@ -119,6 +149,7 @@ String _ast_to_string(Arena *arena, AST* node, u8 op_precedence) {
 
             break;
         }
+
         case AST_UNARYOP: {
             uint8_t current_op_precedence = op_type_precedence(node->binop.op);
 
@@ -132,6 +163,7 @@ String _ast_to_string(Arena *arena, AST* node, u8 op_precedence) {
             }
             
         }
+
         case AST_CALL: {
             if (node->func_call.args.size == 1) {
                 String arg_string = _ast_to_string(arena, node->func_call.args.data[0], op_precedence);
@@ -141,9 +173,23 @@ String _ast_to_string(Arena *arena, AST* node, u8 op_precedence) {
                 sprintf(output.str, "%s(args)", node->func_call.name.str); break;
             }
         }
+
         case AST_EMPTY: break;
+        
         default: fprintf(stderr, "ERROR: Cannot do 'ast_to_string' because node type '%s' is not implemented.\n", ast_type_to_debug_string(node->type)); exit(1);
+    
     }
+
+    // TODO: remove this when String has the functionality to remove the hacks in this function
+    // 
+    // determine the size of the string
+    for (usize i = 0; i < 1024; i++) {
+        if (output.str[i] == '\0') {
+            output.size = i;
+            break;
+        }
+    }
+
     return output;
 }
 

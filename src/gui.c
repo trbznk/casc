@@ -65,12 +65,6 @@ void init_gui() {
         
         if (c != 0) {
             cell_input_buffer = string_insert(&gui_arena, cell_input_buffer, char_to_string(&gui_arena, c), cursor_position);
-            // memmove(
-            //     &cell_input_buffer[cursor_position+1],
-            //     &cell_input_buffer[cursor_position],
-            //     strlen(cell_input_buffer)-cursor_position+1 // we need to add 1 here, because it's a null terminated string for now
-            // );
-            // cell_input_buffer[cursor_position] = c;
             cursor_position++;
         } else if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) {
             if (cursor_position > 0) {
@@ -80,11 +74,6 @@ void init_gui() {
                     string_slice(&gui_arena, cell_input_buffer, 0, idx_to_delete),
                     string_slice(&gui_arena, cell_input_buffer, idx_to_delete+1, cell_input_buffer.size)
                 );
-                // memmove(
-                //     &cell_input_buffer[idx_to_delete],
-                //     &cell_input_buffer[idx_to_delete+1],
-                //     strlen(cell_input_buffer)-cursor_position+1 // we need to add 1 here, because it's a null terminated string for now
-                // );
                 cursor_position--;
             }
         } else if (IsKeyPressed(KEY_LEFT)) {
@@ -141,11 +130,8 @@ void init_gui() {
         DrawLine(0, line_height, screen_width, line_height, COLOR_MOONSTONE);
 
         if (cell_output_buffer.size > 0) {
-            // printf("strlen(cell_output_buffer)=%lu\n", strlen(cell_output_buffer));
-            if (cell_output_buffer.size > 0) {
-                Vector2 output_text_pos = { padding.x, line_height + padding.y, };
-                DrawTextEx(font, cell_output_buffer.str, output_text_pos, font_size.y, 2, COLOR_DARK_GREEN);
-            }
+            Vector2 output_text_pos = { padding.x, line_height + padding.y };
+            DrawTextEx(font, cell_output_buffer.str, output_text_pos, font_size.y, 2, COLOR_DARK_GREEN);
         }
 
         EndDrawing();

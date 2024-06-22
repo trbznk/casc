@@ -1,3 +1,7 @@
+// TODO: Do we really want our own String struct to be extended to a null terminated
+//       string? In the past we have some memory errors because it's very easy to forget
+//       this if we implement new functions for strings.
+
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -9,7 +13,8 @@
 #include "casc.h"
 
 #define ARENA_SIZE 1024
-#define TEST_EARLY_STOP true
+#define TEST_EARLY_STOP false
+#define ARENA_MALLOC_ALWAYS false
 
 Arena init_arena() {
     Arena arena = {0};
@@ -41,11 +46,14 @@ void *arena_alloc(Arena *arena, usize size) {
 
     // bring size up to a power of 2 to have proper alignment
     usize padding = 64;
+    // TODO: oldsize is just temporary and can be removed in the future when we have removed the arena bugs.
+    usize old_size = size;
     size = size+(padding-size%padding);
     assert(size > 0);
     assert(size % 32 == 0);
+    printf("INFO: allocate %zu bytes pad it up to %zu\n", old_size, size);
 
-# if 0
+#if ARENA_MALLOC_ALWAYS
     static bool has_seen_arena_alloc_malloc_warning = false;
     if (!has_seen_arena_alloc_malloc_warning) {
         printf("WARNING: currently arena is using malloc always!\n");
@@ -56,7 +64,7 @@ void *arena_alloc(Arena *arena, usize size) {
 
     usize free_capacity = arena->size - arena->offset;
 
-#if 0
+#if 1
     printf("size=%zu, arena->size=%zu, free_capacity=%zu, reallocs_count=%u\n", size, arena->size, free_capacity, arena->reallocs_count);
 #endif
 
@@ -92,6 +100,7 @@ void *arena_alloc(Arena *arena, usize size) {
     printf("arena_memory_used = %.2f\n", arena_memory_used);
 #endif
 
+    printf("memory=%p\n", memory);
     return memory;
 }
 
@@ -123,7 +132,7 @@ String string_slice(Arena *arena, String s, usize start, usize stop) {
 String string_concat(Arena *arena, String s1, String s2) {
     String s = {0};
     s.size = s1.size+s2.size;
-    s.str = arena_alloc(arena, s.size);
+    s.str = arena_alloc(arena, s.size+1);
     strncpy(s.str, s1.str, s1.size);
     strncpy(&s.str[s1.size], s2.str, s2.size);
     s.str[s.size] = '\0';
@@ -181,9 +190,10 @@ void _test_ast(u32 line_number, String source, String test_source) {
         printf("!=\n");
         print(test_source);
         
-        if (TEST_EARLY_STOP) {
-            exit(1);
-        }
+#if TEST_EARLY_STOP
+        exit(1);
+#endif
+
     } else { 
         printf("OK\n");
     }

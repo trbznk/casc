@@ -1,13 +1,5 @@
-TODO:
-- init_string to only accept const chars (because its mostly used in this way)
-- memset 0 when initialize the arena (but do we need this really)
-
-arena allocator
-- malloc one fixed-big chunk of memory with malloc
-- using your own malloc if you need memory
-- use your allocated arena to give memory then
-- the basic idea is to malloc one arena per task
-- after the task is done it's possible to free all memory related
-  to the task very easily
-- so in this case we dont need to free single ASTNodes and similar things
-  like ast_match and so on.
+ROADMAP
+- implement 'all' common features of a calculator
+- implement 'all' functions from python math module
+- multiline statements including variables
+- multiple cells (first time kind of a notebook feel)
