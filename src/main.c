@@ -13,7 +13,7 @@
 #include "casc.h"
 
 #define ARENA_SIZE 1024
-#define TEST_EARLY_STOP false
+#define TEST_EARLY_STOP true
 #define ARENA_MALLOC_ALWAYS false
 
 Arena init_arena() {
@@ -43,15 +43,16 @@ void arena_reset(Arena *arena) {
 }
 
 void *arena_alloc(Arena *arena, usize size) {
+    printf("INFO: alloc %zu bytes\n", size);
 
     // bring size up to a power of 2 to have proper alignment
     usize padding = 64;
     // TODO: oldsize is just temporary and can be removed in the future when we have removed the arena bugs.
-    usize old_size = size;
+    // usize old_size = size;
     size = size+(padding-size%padding);
     assert(size > 0);
     assert(size % 32 == 0);
-    printf("INFO: allocate %zu bytes pad it up to %zu\n", old_size, size);
+    // printf("INFO: allocate %zu bytes pad it up to %zu\n", old_size, size);
 
 #if ARENA_MALLOC_ALWAYS
     static bool has_seen_arena_alloc_malloc_warning = false;
@@ -64,7 +65,7 @@ void *arena_alloc(Arena *arena, usize size) {
 
     usize free_capacity = arena->size - arena->offset;
 
-#if 1
+#if 0
     printf("size=%zu, arena->size=%zu, free_capacity=%zu, reallocs_count=%u\n", size, arena->size, free_capacity, arena->reallocs_count);
 #endif
 
@@ -97,10 +98,9 @@ void *arena_alloc(Arena *arena, usize size) {
     assert(arena->offset < arena->size);
 
 #if 0
-    printf("arena_memory_used = %.2f\n", arena_memory_used);
+    printf("memory=%p, arena_memory_used = %.2f\n", memory, arena_memory_used);
 #endif
 
-    printf("memory=%p\n", memory);
     return memory;
 }
 
@@ -157,7 +157,6 @@ bool string_eq(String s1, String s2) {
             return false;
         }
     }
-
     return true;
 }
 
@@ -184,11 +183,18 @@ void _test_ast(u32 line_number, String source, String test_source) {
     printf("test:%d ... ", line_number);
 
     String output_string = ast_to_string(ip.arena, output);
-    if (string_eq(output_string, test_source) != 0) {
+    if (!string_eq(output_string, test_source)) {
         printf("FAILED\n");
+        printf("\nPARAMETERS:\n");
+        printf("source:\n");
+        print(source);
+        printf("test_source:\n");
+        print(test_source);
+        printf("\nASSERTION:\n");
         print(output_string);
         printf("!=\n");
         print(test_source);
+        printf("\n");
         
 #if TEST_EARLY_STOP
         exit(1);
@@ -226,32 +232,6 @@ void test() {
     // things from the sympy tutorial
     test_ast("sqrt(8)", "2*sqrt(2)");
     // TEST_SOURCE_TO_INTERP("sqrt(8)", _create_ast_binop(_create_ast_integer(2), create_ast_call((Token){ .text="sqrt" }, _create_ast_integer(2)), OP_MUL));
-
-    // misc
-    test_ast("sqrt(9)", "3");
-    test_ast("1/3 * sin(pi) - cos(pi/2) / cos(pi) + 54/2 * sqrt(9)", "81");
-    test_ast("3^2^3", "6561");
-    test_ast("3^(2^3)", "6561");
-    test_ast("(3^2)^3", "729");
-    test_ast("3^4 - (-100)^2", "-9919");
-    test_ast("-3^2", "-9");
-    test_ast("(-3)^2", "9");
-    test_ast("-2*-3", "6");
-    test_ast("2*-3", "-6");
-    test_ast("cos(pi)^2+1", "2");
-    test_ast("x^0", "1");
-    test_ast("x^1", "x");
-    test_ast("1/8 * (-4-2*4/3-1)", "-23/24");
-    test_ast("a+0", "a");
-    test_ast("0+a", "a");
-    test_ast("a-0", "a");
-    test_ast("a*1", "a");
-    test_ast("ln(e)", "1");
-    test_ast("ln(1)", "0");
-    test_ast("log(1, 10)", "0");
-    test_ast("log(10, 10)", "1");
-    test_ast("-x^2", "-x^2");
-    test_ast("(-x)^2", "(-x)^2");
 
     // auto generated
     test_ast("48+-75", "-27");
@@ -305,12 +285,39 @@ void test() {
     test_ast("(-45*-23)", "1035");
     test_ast("(-81+0)", "-81");
     test_ast("(-52-80)", "-132");
+    
+    // misc
+    test_ast("sqrt(9)", "3");
+    test_ast("1/3 * sin(pi) - cos(pi/2) / cos(pi) + 54/2 * sqrt(9)", "81");
+    test_ast("3^2^3", "6561");
+    test_ast("3^(2^3)", "6561");
+    test_ast("(3^2)^3", "729");
+    test_ast("3^4 - (-100)^2", "-9919");
+    test_ast("-3^2", "-9");
+    test_ast("(-3)^2", "9");
+    test_ast("-2*-3", "6");
+    test_ast("2*-3", "-6");
+    test_ast("cos(pi)^2+1", "2");
+    test_ast("x^0", "1");
+    test_ast("x^1", "x");
+    test_ast("1/8 * (-4-2*4/3-1)", "-23/24");
+    test_ast("a+0", "a");
+    test_ast("0+a", "a");
+    test_ast("a-0", "a");
+    test_ast("a*1", "a");
+    test_ast("ln(e)", "1");
+    test_ast("ln(1)", "0");
+    test_ast("log(1, 10)", "0");
+    test_ast("log(10, 10)", "1");
+    test_ast("-x^2", "-x^2");
+    test_ast("(-x)^2", "(-x)^2");
     test_ast("-8^8", "-16777216");
     test_ast("(-29*-17)", "493");
     test_ast("(-24--40)", "16");
     test_ast("1/3*2", "2/3");
     test_ast("1/8 + 1", "9/8");
     test_ast("sin(4/5)*2-5.2/4", "0.134712");
+    test_ast("log(8, 2)", "3");
 
     printf("\n\n");
 

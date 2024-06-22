@@ -451,6 +451,22 @@ AST *interp_log(Interp *ip, AST *y, AST *b) {
         return INTEGER(1);
     }
 
+    // compute
+    if (ast_is_numeric(y) && ast_is_numeric(b)) {
+        f64 y_value = ast_to_f64(y);
+        f64 b_value = ast_to_f64(b);
+        
+        assert(y_value > 0.0);
+        // TODO: which values are allowed for b?
+
+        // TODO: for common bases like e, 2, 10 we dont need base change because they are basically implemented
+        //       in math.h. So probably we have not the best precision right now, because we always use the
+        //       base change formula.
+        //
+        // base change
+        AST *result = REAL(log(y_value) / log(b_value));
+        return interp(ip, result);
+    }
 
     // TODO: implement maybe variadic function or macro to simplify ast array
     //       creation from with args given.
@@ -460,6 +476,39 @@ AST *interp_log(Interp *ip, AST *y, AST *b) {
     return CALL(init_string("log"), args);
 }
 
+AST* interp_sqrt(Interp *ip, AST *x) {
+    // check for perfect square for simplifying
+    //
+    // TODO: this is probably an inefficient way to compute the biggest perfect sqaure factor of a given number
+    // TODO: tranform this into f64
+    for (i32 q = x->integer.value; q > 1; q--) {
+        double sqrt_of_q = sqrtf((double)q);
+        bool is_perfect_square = sqrt_of_q == floor(sqrt_of_q);
+        if (is_perfect_square && x->integer.value % q == 0) {
+            i32 p = x->integer.value / q;
+            ASTArray new_args = {0};
+            ast_array_append(ip->arena, &new_args, INTEGER(p));
+            AST *result = MUL(INTEGER((i64)sqrt_of_q), CALL(init_string("sqrt"), new_args));
+            return interp(ip, result);
+        }
+    }
+
+    // sqrt(1)
+    if (ast_match(x, INTEGER(1))) {
+        return INTEGER(1);
+    }
+
+    // compute
+    // if (ast_is_numeric(x)) {
+    //     f64 value = ast_to_f64(x);
+    //     return interp(ip, REAL(sqrt(value)));
+    // }
+
+    ASTArray args = {0};
+    ast_array_append(ip->arena, &args, x);
+    return CALL(init_string("sqrt"), args);
+}
+
 AST* interp_call(Interp *ip, String name, ASTArray args) {
 
     for (usize i = 0; i < args.size; i++) {
@@ -467,24 +516,8 @@ AST* interp_call(Interp *ip, String name, ASTArray args) {
     }
 
     if (string_eq(name, init_string("sqrt")) && args.data[0]->type == AST_INTEGER) {
-        double result = sqrt((double)args.data[0]->integer.value);
-
-        if (fmod((double)args.data[0]->integer.value, result) == 0.0) {
-            return INTEGER((i64)result);
-        }
-
-        // check for perfect square
-        // @Speed: this is probably an inefficient way to compute the biggest perfect sqaure factor of a given number
-        for (i32 q = args.data[0]->integer.value; q > 1; q--) {
-            double sqrt_of_q = sqrtf((double)q);
-            bool is_perfect_square = sqrt_of_q == floor(sqrt_of_q);
-            if (is_perfect_square && args.data[0]->integer.value % q == 0) {
-                i32 p = args.data[0]->integer.value / q;
-                ASTArray new_args = {0};
-                ast_array_append(ip->arena, &new_args, INTEGER(p));
-                return MUL(INTEGER((i64)sqrt_of_q), CALL(name, new_args));
-            }
-        }
+        assert(args.size == 1);
+        return interp_sqrt(ip, args.data[0]);
     } else if (string_eq(name, init_string("ln"))) {
         if (ast_match(args.data[0], SYMBOL(init_string("e")))) {
             return INTEGER(1);
