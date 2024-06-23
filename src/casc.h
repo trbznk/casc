@@ -99,6 +99,7 @@ bool is_builtin_constant(String);
 #define INTEGER(value) init_ast_integer(ip->allocator, value)
 #define REAL(value) init_ast_real(ip->allocator, value)
 #define SYMBOL(name) init_ast_symbol(ip->allocator, name)
+#define CONSTANT(name) init_ast_constant(ip->allocator, name)
 #define ADD(left, right) init_ast_binop(ip->allocator, left, right, OP_ADD)
 #define SUB(left, right) init_ast_binop(ip->allocator, left, right, OP_SUB)
 #define MUL(left, right) init_ast_binop(ip->allocator, left, right, OP_MUL)
@@ -125,12 +126,13 @@ typedef enum {
     AST_INTEGER,
     AST_REAL,
     AST_SYMBOL,
+    AST_CONSTANT,
     AST_BINOP,
     AST_UNARYOP,
 
     AST_CALL,
 
-    // @remove AST_EMPTY type when there are more high level nodes like NODE_PROGRAMM or something similar
+    // TODO: AST_EMPTY type when there are more high level nodes like NODE_PROGRAMM or something similar
     AST_EMPTY,
 
     AST_TYPE_COUNT
@@ -158,6 +160,10 @@ struct AST {
         } symbol;
 
         struct {
+            String name;
+        } constant;
+
+        struct {
             AST *left;
             AST *right;
             OpType op;
@@ -173,13 +179,14 @@ struct AST {
             ASTArray args;
         } func_call;
 
-        bool empty; // temporary for ASTType empty - @remove
+        bool empty; // TODO: temporary for ASTType empty
     };
 };
 
 AST* init_ast_integer(Allocator*, i64);
 AST* init_ast_real(Allocator*, f64);
 AST* init_ast_symbol(Allocator*, String);
+AST* init_ast_constant(Allocator*, String);
 AST* init_ast_binop(Allocator*, AST*, AST*, OpType);
 AST* init_ast_unaryop(Allocator*, AST*, OpType);
 AST* init_ast_call(Allocator*, String, ASTArray);
@@ -213,7 +220,11 @@ AST* parse_factor(Lexer*);
 
 typedef struct FunctionSignature FunctionSignature;
 struct FunctionSignature {
+    // TODO: really not possible to use our own String type here?
     const char *name;
+
+    // maybe we change this to i32 in the future to encode 
+    // variadic amount of args with something like -1.
     usize args_count;
 };
 

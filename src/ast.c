@@ -2,6 +2,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
+#include <math.h>
 
 #include "casc.h"
 
@@ -39,6 +40,7 @@ const char* ast_type_to_debug_string(ASTType type) {
         case AST_INTEGER: return "Integer";
         case AST_REAL: return "Real";
         case AST_SYMBOL: return "Symbol";
+        case AST_CONSTANT: return "Constant";
         case AST_BINOP: return "BinOp";
         case AST_UNARYOP: return "UnaryOp";
         case AST_CALL: return "FuncCall";
@@ -97,6 +99,13 @@ AST* init_ast_symbol(Allocator* allocator, String name) {
     AST *node = alloc(allocator, sizeof(AST));
     node->type = AST_SYMBOL;
     node->symbol.name = name;
+    return node;
+}
+
+AST* init_ast_constant(Allocator* allocator, String name) {
+    AST *node = alloc(allocator, sizeof(AST));
+    node->type = AST_CONSTANT;
+    node->constant.name = name;
     return node;
 }
 
@@ -182,15 +191,30 @@ bool ast_contains(AST *node, AST *target) {
 
 f64 ast_to_f64(AST *node) {
     switch (node->type) {
+        
         case AST_INTEGER:
             return (f64) node->integer.value;
+        
         case AST_REAL:
             return node->real.value;
-        case AST_BINOP:
+        
+        case AST_BINOP: {
             assert(ast_is_numeric(node));
             assert(node->binop.left->type == AST_INTEGER);
             assert(node->binop.right->type == AST_INTEGER);
             return (f64) node->binop.left->integer.value / (f64) node->binop.right->integer.value;
+        }
+
+        case AST_CONSTANT: {
+            if (string_eq(node->constant.name, init_string("e"))) {
+                return M_E;
+            } else if (string_eq(node->constant.name, init_string("pi"))) {
+                return M_PI;
+            } else {
+                todo()
+            }
+        }
+
         default: 
             panic("not allowed");
     }
@@ -217,6 +241,10 @@ bool ast_is_numeric(AST* node) {
                 return true;
             }
         }
+    }
+
+    if (node->type == AST_CONSTANT) {
+        return true;
     }
 
     return false;

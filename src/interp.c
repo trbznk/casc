@@ -66,6 +66,8 @@ bool ast_match(AST* left, AST* right) {
                 return left->real.value == right->real.value;
             case AST_SYMBOL:
                 return string_eq(left->symbol.name, right->symbol.name);
+            case AST_CONSTANT:
+                return string_eq(left->constant.name, right->constant.name);
             case AST_BINOP:
                 return ast_match(left->binop.left, right->binop.left) && ast_match(left->binop.right, right->binop.right);
             case AST_CALL: {
@@ -177,6 +179,9 @@ String _ast_to_string(Allocator *allocator, AST* node, u8 op_precedence) {
         
         case AST_SYMBOL:
             sprintf(output.str, "%s", node->symbol.name.str); break;
+
+        case AST_CONSTANT:
+            sprintf(output.str, "%s", node->constant.name.str); break;
         
         case AST_BINOP: {
 
@@ -447,7 +452,7 @@ AST* diff(Interp *ip, AST *expr, AST *var) {
 }
 
 AST *interp_sin(Interp *ip, AST* x) {
-    if (ast_match(x, SYMBOL(init_string("pi")))) {
+    if (ast_match(x, CONSTANT(init_string("pi")))) {
         return INTEGER(0);
     } else if (ast_is_numeric(x)) {
         f64 value = ast_to_f64(x);
@@ -462,9 +467,9 @@ AST *interp_sin(Interp *ip, AST* x) {
 AST *interp_cos(Interp *ip, AST* x) {    
     if (ast_match(x, INTEGER(0))) {
         return INTEGER(1);
-    } else if (ast_match(x, DIV(SYMBOL(init_string("pi")), INTEGER(2)))) {
+    } else if (ast_match(x, DIV(CONSTANT(init_string("pi")), INTEGER(2)))) {
         return INTEGER(0);
-    } else if (ast_match(x, SYMBOL(init_string("pi")))) {
+    } else if (ast_match(x, CONSTANT(init_string("pi")))) {
         return INTEGER(-1);
     } else if (ast_is_numeric(x)) {
         f64 value = ast_to_f64(x);
@@ -575,7 +580,7 @@ AST* interp_call(Interp *ip, String name, ASTArray args) {
     if (string_eq(name, init_string("sqrt"))) {
         return interp_sqrt(ip, args.data[0]);
     } else if (string_eq(name, init_string("ln"))) {
-        return interp_log(ip, args.data[0], SYMBOL(init_string("e")));
+        return interp_log(ip, args.data[0], CONSTANT(init_string("e")));
     } else if (string_eq(name, init_string("log"))) {
         return interp_log(ip, args.data[0], args.data[1]);
     } else if (string_eq(name, init_string("sin"))) {
@@ -584,6 +589,10 @@ AST* interp_call(Interp *ip, String name, ASTArray args) {
         return interp_cos(ip, args.data[0]);
     } else if (string_eq(name, init_string("tan"))) {
         return interp_tan(ip, args.data[0]);
+    } else if (string_eq(name, init_string("pow"))) {
+        return interp(ip, POW(args.data[0], args.data[1]));
+    } else if (string_eq(name, init_string("exp"))) {
+        return interp(ip, POW(CONSTANT(init_string("e")), args.data[0]));
     } else if (string_eq(name, init_string("diff"))) {
         AST* diff_var;
 
@@ -616,14 +625,26 @@ AST* interp_call(Interp *ip, String name, ASTArray args) {
     return CALL(name, args);
 }
 
-AST* interp(Interp *ip, AST* node) {
+AST *interp_symbol(Interp *ip, String name) {
+    // here comes the check for defined variables in the future
+    if (is_builtin_constant(name)) {
+        return CONSTANT(name);
+    }
+
+    return SYMBOL(name);
+}
+
+AST *interp(Interp *ip, AST* node) {
     switch (node->type) {
         case AST_BINOP:
             return interp_binop(ip, node->binop.left, node->binop.right, node->binop.op);
         case AST_UNARYOP:
             return interp_unaryop(ip, node->unaryop.op, node->unaryop.operand);
         case AST_INTEGER:
+            return node;
         case AST_SYMBOL:
+            return interp_symbol(ip, node->symbol.name);
+        case AST_CONSTANT:
             return node;
         case AST_REAL: {
             f64 value = node->real.value;
