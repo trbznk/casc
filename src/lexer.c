@@ -57,7 +57,7 @@ Token lexer_next_token(Lexer *lexer) {
         String buffer = init_string("");
         while (isdigit(lexer_current_char(lexer)) || lexer_current_char(lexer) == '.') {
             char current_char = lexer_current_char(lexer);
-            buffer = string_concat(lexer->arena, buffer, char_to_string(lexer->arena, current_char));
+            buffer = string_concat(lexer->allocator, buffer, char_to_string(lexer->allocator, current_char));
             lexer->pos += 1;
         }
         token.type = TOKEN_NUMBER;
@@ -85,7 +85,7 @@ Token lexer_next_token(Lexer *lexer) {
             isdigit(lexer_current_char(lexer))))
         ) {
             char current_char = lexer_current_char(lexer);
-            buffer = string_concat(lexer->arena, buffer, char_to_string(lexer->arena, current_char));
+            buffer = string_concat(lexer->allocator, buffer, char_to_string(lexer->allocator, current_char));
             lexer->pos += 1;
         }
 
@@ -98,43 +98,43 @@ Token lexer_next_token(Lexer *lexer) {
             lexer->pos = first;
             token.type = TOKEN_IDENTIFIER;
             char current_char = lexer_current_char(lexer);
-            token.text = char_to_string(lexer->arena, current_char);
+            token.text = char_to_string(lexer->allocator, current_char);
             lexer->pos += 1;
             return token;
         }
     } else if (lexer_current_char(lexer) == '+') {
         token.type = TOKEN_PLUS;
-        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (lexer_current_char(lexer) == '-') {
         token.type = TOKEN_MINUS;
-        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (lexer_current_char(lexer) == '*') {
         token.type = TOKEN_STAR;
-        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (lexer_current_char(lexer) == '/') {
         token.type = TOKEN_SLASH;
-        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (lexer_current_char(lexer) == '^') {
         token.type = TOKEN_CARET;
-        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (lexer_current_char(lexer) == '(') {
         token.type = TOKEN_L_PAREN;
-        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (lexer_current_char(lexer) == ')') {
         token.type = TOKEN_R_PAREN;
-        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else if (isspace(lexer_current_char(lexer))) {
@@ -143,7 +143,7 @@ Token lexer_next_token(Lexer *lexer) {
         return lexer_next_token(lexer);
     } else if (lexer_current_char(lexer) == ',') {
         token.type = TOKEN_COMMA;
-        token.text = char_to_string(lexer->arena, lexer_current_char(lexer));
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
     } else {

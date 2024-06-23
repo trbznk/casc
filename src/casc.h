@@ -9,7 +9,9 @@
 typedef struct AST AST;
 typedef struct Parser Parser;
 typedef struct Arena Arena;
+typedef struct Allocator Allocator;
 typedef struct String String;
+typedef struct Lexer Lexer;
 
 //
 // Basic Types
@@ -33,11 +35,11 @@ struct String {
 };
 
 String init_string(const char *str);
-String char_to_string(Arena *arena, char c);
-String string_slice(Arena *arena, String s, usize start, usize stop);
-String string_concat(Arena *arena, String s1, String s2);
-String string_insert(Arena *arena, String s1, String s2, usize idx);
-String string_insert_char(Arena *arena, String s1, char c, usize idx);
+String char_to_string(Allocator *allocator, char c);
+String string_slice(Allocator *allocator, String s, usize start, usize stop);
+String string_concat(Allocator *allocator, String s1, String s2);
+String string_insert(Allocator *allocator, String s1, String s2, usize idx);
+String string_insert_char(Allocator *allocator, String s1, char c, usize idx);
 bool string_eq(String s1, String s2);
 void print(String s);
 
@@ -82,9 +84,8 @@ typedef struct {
     bool contains_dot;
 } Token;
 
-typedef struct Lexer Lexer;
 struct Lexer {
-    Arena *arena;
+    Allocator *allocator;
     String source;
     usize pos;
 };
@@ -103,15 +104,15 @@ bool is_builtin_constant(String);
 // ast
 //
 
-#define INTEGER(value) init_ast_integer(ip->arena, value)
-#define REAL(value) init_ast_real(ip->arena, value)
-#define SYMBOL(name) init_ast_symbol(ip->arena, name)
-#define ADD(left, right) init_ast_binop(ip->arena, left, right, OP_ADD)
-#define SUB(left, right) init_ast_binop(ip->arena, left, right, OP_SUB)
-#define MUL(left, right) init_ast_binop(ip->arena, left, right, OP_MUL)
-#define DIV(left, right) init_ast_binop(ip->arena, left, right, OP_DIV)
-#define POW(left, right) init_ast_binop(ip->arena, left, right, OP_POW)
-#define CALL(name, args) init_ast_call(ip->arena, name, args)
+#define INTEGER(value) init_ast_integer(ip->allocator, value)
+#define REAL(value) init_ast_real(ip->allocator, value)
+#define SYMBOL(name) init_ast_symbol(ip->allocator, name)
+#define ADD(left, right) init_ast_binop(ip->allocator, left, right, OP_ADD)
+#define SUB(left, right) init_ast_binop(ip->allocator, left, right, OP_SUB)
+#define MUL(left, right) init_ast_binop(ip->allocator, left, right, OP_MUL)
+#define DIV(left, right) init_ast_binop(ip->allocator, left, right, OP_DIV)
+#define POW(left, right) init_ast_binop(ip->allocator, left, right, OP_POW)
+#define CALL(name, args) init_ast_call(ip->allocator, name, args)
 
 typedef struct ASTArray ASTArray;
 
@@ -184,22 +185,22 @@ struct AST {
     };
 };
 
-AST* init_ast_integer(Arena*, i64);
-AST* init_ast_real(Arena*, f64);
-AST* init_ast_symbol(Arena*, String);
-AST* init_ast_binop(Arena*, AST*, AST*, OpType);
-AST* init_ast_unaryop(Arena*, AST*, OpType);
-AST* init_ast_call(Arena*, String, ASTArray);
-AST* init_ast_empty(Arena*);
+AST* init_ast_integer(Allocator*, i64);
+AST* init_ast_real(Allocator*, f64);
+AST* init_ast_symbol(Allocator*, String);
+AST* init_ast_binop(Allocator*, AST*, AST*, OpType);
+AST* init_ast_unaryop(Allocator*, AST*, OpType);
+AST* init_ast_call(Allocator*, String, ASTArray);
+AST* init_ast_empty(Allocator*);
 
-void ast_array_append(Arena*, ASTArray*, AST*);
+void ast_array_append(Allocator*, ASTArray*, AST*);
 
 const char *op_type_to_debug_string(OpType);
 const char *op_type_to_string(OpType);
 const char *ast_type_to_debug_string(ASTType);
 uint8_t op_type_precedence(OpType);
 
-ASTArray ast_to_flat_array(Arena*, AST*);
+ASTArray ast_to_flat_array(Allocator*, AST*);
 bool ast_contains(AST*, AST*);
 bool ast_is_fraction(AST*);
 bool ast_is_numeric(AST*);
@@ -220,7 +221,7 @@ AST* parse_factor(Lexer*);
 //
 
 typedef struct {
-    Arena *arena;
+    Allocator *allocator;
 } Interp;
 
 AST *interp(Interp*, AST*);
@@ -229,9 +230,9 @@ AST *interp_binop_pow(Interp*, AST*, AST*);
 bool ast_match(AST*, AST*);
 bool ast_match_type(AST*, AST*);
 
-String _ast_to_string(Arena*, AST*, u8);
-#define ast_to_string(arena, node) _ast_to_string(arena, node, 0)
-String ast_to_debug_string(Arena*, AST*);
+String _ast_to_string(Allocator*, AST*, u8);
+#define ast_to_string(allocator, node) _ast_to_string(allocator, node, 0)
+String ast_to_debug_string(Allocator*, AST*);
 
 //
 // gui
@@ -248,13 +249,18 @@ void init_gui();
 
 struct Arena {
     void *memory;
+    Arena *prev;
 
     usize offset;
-    usize size;
 
-    u32 reallocs_count;
+    // TODO: when arena size is always the same we dont need this one
+    usize size;
 };
 
-Arena init_arena();
-void arena_free(Arena*);
-void *arena_alloc(Arena*, usize);
+struct Allocator {
+    Arena *arena; 
+};
+
+Allocator init_allocator();
+void *alloc(Allocator *allocator, usize size);
+void free_allocator(Allocator *allocator);

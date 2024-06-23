@@ -14,94 +14,65 @@
 
 #define ARENA_SIZE 1024
 #define TEST_EARLY_STOP true
-#define ARENA_MALLOC_ALWAYS false
 
-Arena init_arena() {
-    Arena arena = {0};
-    arena.memory = malloc(ARENA_SIZE);
-    if (arena.memory == NULL) {
-        todo()
-    }
-    arena.size = ARENA_SIZE;
-    return arena;
+Allocator init_allocator() {
+    Allocator a = {0};
+    return a;
 }
 
-void arena_free(Arena *arena) {
-    // maybe we need a arena_reset function too. This would reset the arena
-    // to offset 0 but not free the memory. So the same arena can be used again
-    // without a new malloc.
-    if (arena->memory != NULL) {
-        free(arena->memory);
-    }
-    arena->memory = NULL;
-    arena->offset = 0;
-}
-
-// maybe @unused
-void arena_reset(Arena *arena) {
-    arena->offset = 0;
-}
-
-void *arena_alloc(Arena *arena, usize size) {
-    printf("INFO: alloc %zu bytes\n", size);
-
+void *alloc(Allocator *allocator, usize size) {
     // bring size up to a power of 2 to have proper alignment
     usize padding = 64;
-    // TODO: oldsize is just temporary and can be removed in the future when we have removed the arena bugs.
-    // usize old_size = size;
-    size = size+(padding-size%padding);
+    if (size % padding != 0) {
+        size = size+(padding-size%padding);
+    }
     assert(size > 0);
     assert(size % 32 == 0);
-    // printf("INFO: allocate %zu bytes pad it up to %zu\n", old_size, size);
+    assert(size <= ARENA_SIZE);
 
-#if ARENA_MALLOC_ALWAYS
-    static bool has_seen_arena_alloc_malloc_warning = false;
-    if (!has_seen_arena_alloc_malloc_warning) {
-        printf("WARNING: currently arena is using malloc always!\n");
-        has_seen_arena_alloc_malloc_warning = true;
-    }
-    return malloc(size);
-#endif
-
-    usize free_capacity = arena->size - arena->offset;
-
-#if 0
-    printf("size=%zu, arena->size=%zu, free_capacity=%zu, reallocs_count=%u\n", size, arena->size, free_capacity, arena->reallocs_count);
-#endif
-
-    if (free_capacity <= size) {
-        usize new_size;
-
-        if (size < ARENA_SIZE) {
-            new_size = arena->size + ARENA_SIZE;
-        } else {
-            // Do we need padding here? @note
-            new_size = arena->size + size;
-        }
-
-        arena->size = new_size ;
-        arena->memory = realloc(arena->memory, arena->size);
-        if (arena->memory == NULL) {
-            todo()
-        }
-        arena->reallocs_count += 1;
+    // check if we have a arena
+    if (allocator->arena == NULL) {
+        // TODO: duplicate code here @1
+        allocator->arena = calloc(1, sizeof(Arena)); // to ensure zero initialization
+        allocator->arena->memory = malloc(ARENA_SIZE);
+        allocator->arena->size = ARENA_SIZE;
+        assert(allocator->arena->memory != NULL);
     }
 
-    // current position in the memory
+    // compute free capacity of current arena
+    usize free_capacity = allocator->arena->size - allocator->arena->offset;
+
+    // choose arena
+    if (free_capacity < size) {
+        Arena *last_arena = allocator->arena;
+        // TODO: duplicate code here @1
+        allocator->arena = calloc(1, sizeof(Arena));
+        allocator->arena->memory = malloc(ARENA_SIZE);
+        allocator->arena->size = ARENA_SIZE;
+        allocator->arena->prev = last_arena; // difference @1
+        assert(allocator->arena->memory != NULL);
+    }
+    Arena *arena = allocator->arena;
+
+    // give memory
     void *memory = arena->memory + arena->offset;
-
-    // compute the new position in the memory
     arena->offset += size;
-
-    // double arena_memory_used = (double)arena->offset / (double)arena->size;
-    // assert(arena_memory_used < 0.5);
-    assert(arena->offset < arena->size);
-
-#if 0
-    printf("memory=%p, arena_memory_used = %.2f\n", memory, arena_memory_used);
-#endif
-
     return memory;
+}
+
+void free_allocator(Allocator *allocator) {
+    Arena *arena = allocator->arena;
+    while (arena != NULL) {
+        Arena *prev_arena = arena->prev;
+        free(arena->memory);
+        free(arena);
+        if (prev_arena != NULL) {
+            arena = prev_arena;
+        } else {
+            // TODO: maybe we dont need this because free ensures that arena is NULL now
+            arena = NULL; 
+        }
+    }
 }
 
 String init_string(const char *str) {
@@ -111,39 +82,40 @@ String init_string(const char *str) {
     return s;
 }
 
-String char_to_string(Arena *arena, char c) {
+String char_to_string(Allocator *allocator, char c) {
     String s = {0};
     s.size = 1;
-    s.str = arena_alloc(arena, 2);
+    s.str = alloc(allocator, 2);
     s.str[0] = c;
     s.str[1] = '\0';
     return s;
 }
 
-String string_slice(Arena *arena, String s, usize start, usize stop) {
+String string_slice(Allocator *allocator, String s, usize start, usize stop) {
     String new_s = {0};
     new_s.size = stop-start;
-    new_s.str = arena_alloc(arena, new_s.size+1);
+    new_s.str = alloc(allocator, new_s.size+1);
     strncpy(new_s.str, &s.str[start], new_s.size);
     new_s.str[new_s.size] = '\0';
     return new_s;
 }
 
-String string_concat(Arena *arena, String s1, String s2) {
+String string_concat(Allocator *allocator, String s1, String s2) {
     String s = {0};
     s.size = s1.size+s2.size;
-    s.str = arena_alloc(arena, s.size+1);
+    s.str = alloc(allocator, s.size+1);
     strncpy(s.str, s1.str, s1.size);
     strncpy(&s.str[s1.size], s2.str, s2.size);
     s.str[s.size] = '\0';
     return s;
 }
 
-String string_insert(Arena *arena, String s1, String s2, usize idx) {
-    String prefix = string_slice(arena, s1, 0, idx);
-    String postfix = string_slice(arena, s1, idx, s1.size);
-    String new_s = string_concat(arena, prefix, s2);
-    new_s = string_concat(arena, new_s, postfix);
+String string_insert(Allocator *allocator, String s1, String s2, usize idx) {
+    String prefix = string_slice(allocator, s1, 0, idx);
+    String postfix = string_slice(allocator, s1, idx, s1.size);
+    String new_s = string_concat(allocator, prefix, s2);
+    // null termination of new_s.str should be already done in string_concat
+    new_s = string_concat(allocator, new_s, postfix);
     return new_s;
 }
 
@@ -168,21 +140,21 @@ void print(String s) {
 }
 
 void _test_ast(u32 line_number, String source, String test_source) {
-    Arena arena = init_arena();
+    Allocator allocator = init_allocator();
 
     Lexer lexer = {0};
     lexer.source = source;
-    lexer.arena = &arena;
+    lexer.allocator = &allocator;
 
     Interp ip = {0};
-    ip.arena = &arena;
+    ip.allocator = &allocator;
 
     AST* output = parse(&lexer);
     output = interp(&ip, output);
 
     printf("test:%d ... ", line_number);
 
-    String output_string = ast_to_string(ip.arena, output);
+    String output_string = ast_to_string(ip.allocator, output);
     if (!string_eq(output_string, test_source)) {
         printf("FAILED\n");
         printf("\nPARAMETERS:\n");
@@ -204,7 +176,7 @@ void _test_ast(u32 line_number, String source, String test_source) {
         printf("OK\n");
     }
 
-    arena_free(&arena);
+    free_allocator(&allocator);
 }
 
 void test() {
@@ -323,54 +295,51 @@ void test() {
 
     {
         // test strings
-        Arena arena = init_arena();
+        Allocator allocator = init_allocator();
 
         String first = init_string("Alexnder");
 
-        first = string_concat(&arena, first, init_string(" "));
-        first = string_insert(&arena, first, init_string("a"), 4);
+        first = string_concat(&allocator, first, init_string(" "));
+        first = string_insert(&allocator, first, init_string("a"), 4);
 
         String last = init_string("Tebbe");
-        String name = string_concat(&arena, first, last);
+        String name = string_concat(&allocator, first, last);
 
         assert(string_eq(name, init_string("Alexander Tebbe")));
 
         String empty = init_string("");
         String not_empty = init_string("casc");
-        String together = string_concat(&arena, empty, not_empty);
+        String together = string_concat(&allocator, empty, not_empty);
 
         assert(together.size == 4);
 
-        arena_free(&arena);
+        free_allocator(&allocator);
     }
 }
 
 void main_cli() {
-    Arena arena = init_arena();
+    Allocator allocator = init_allocator();
 
     Lexer lexer = {0};
     lexer.source = init_string("5 - - - + - (3 + 4) - +2");
     printf("source:\n");
     print(lexer.source);
-    lexer.arena = &arena;
+    lexer.allocator = &allocator;
 
     Interp ip = {0};
-    ip.arena = &arena;
+    ip.allocator = &allocator;
 
     AST* output = parse(&lexer);
     printf("parsed:\n");
-    print(ast_to_debug_string(&arena, output));
+    print(ast_to_debug_string(&allocator, output));
 
     output = interp(&ip, output);
 
     printf("output:\n");
-    print(ast_to_debug_string(&arena, output));
-    print(ast_to_string(&arena, output));
+    print(ast_to_debug_string(&allocator, output));
+    print(ast_to_string(&allocator, output));
 
-    printf("info:\n");
-    printf("arena.size=%zu\n", arena.size);
-
-    arena_free(&arena);
+    free_allocator(&allocator);
 }
 
 i32 main(i32 argc, char *argv[]) {

@@ -71,9 +71,9 @@ bool ast_match_type(AST *left, AST *right) {
     return false;
 }
 
-String ast_to_debug_string(Arena *arena, AST* node) {
+String ast_to_debug_string(Allocator *allocator, AST* node) {
     String output = {0};
-    output.str = arena_alloc(arena, 1024);
+    output.str = alloc(allocator, 1024);
     switch (node->type) {
 
         case AST_INTEGER:
@@ -90,18 +90,18 @@ String ast_to_debug_string(Arena *arena, AST* node) {
         
         case AST_BINOP: {
             const char *op_string = op_type_to_debug_string(node->binop.op);
-            String left_string = ast_to_debug_string(arena, node->binop.left);
-            String right_string = ast_to_debug_string(arena, node->binop.right);
+            String left_string = ast_to_debug_string(allocator, node->binop.left);
+            String right_string = ast_to_debug_string(allocator, node->binop.right);
             sprintf(output.str, "%s(%s, %s)", op_string, left_string.str, right_string.str);
             break;
         }
         
-        case AST_UNARYOP: sprintf(output.str, "%s(%s)", op_type_to_debug_string(node->unaryop.op), ast_to_debug_string(arena, node->unaryop.operand).str); break;
+        case AST_UNARYOP: sprintf(output.str, "%s(%s)", op_type_to_debug_string(node->unaryop.op), ast_to_debug_string(allocator, node->unaryop.operand).str); break;
         
         // TODO: args to debug string
         case AST_CALL: {
             if (node->func_call.args.size == 1) {
-                sprintf(output.str, "FuncCall(%s, %s)", node->func_call.name.str, ast_to_debug_string(arena, node->func_call.args.data[0]).str); break;
+                sprintf(output.str, "FuncCall(%s, %s)", node->func_call.name.str, ast_to_debug_string(allocator, node->func_call.args.data[0]).str); break;
             } else {
                 // multiple args to string @todo
                 sprintf(output.str, "FuncCall(%s, args)", node->func_call.name.str); break;
@@ -116,14 +116,14 @@ String ast_to_debug_string(Arena *arena, AST* node) {
     return output;
 }
 
-String _ast_to_string(Arena *arena, AST* node, u8 op_precedence) {
+String _ast_to_string(Allocator *allocator, AST* node, u8 op_precedence) {
     // TODO: The use of String in here is very hacky and should be changed in the future.
     //       One of the problems here is that directly writing and accessing the memory
     //       in output.str doesn't affect the size. So without the hacks, the size of the
     //       result string will be 0 in the end.
 
     String output = {0};
-    output.str = arena_alloc(arena, 1024);
+    output.str = alloc(allocator, 1024);
     switch (node->type) {
 
         case AST_INTEGER: sprintf(output.str, "%lld", node->integer.value); break;
@@ -137,8 +137,8 @@ String _ast_to_string(Arena *arena, AST* node, u8 op_precedence) {
 
             uint8_t current_op_precedence = op_type_precedence(node->binop.op);
 
-            String left_string = _ast_to_string(arena, node->binop.left, current_op_precedence);
-            String right_string = _ast_to_string(arena, node->binop.right, current_op_precedence);
+            String left_string = _ast_to_string(allocator, node->binop.left, current_op_precedence);
+            String right_string = _ast_to_string(allocator, node->binop.right, current_op_precedence);
             const char *op_type_string = op_type_to_string(node->binop.op);
 
             if (current_op_precedence < op_precedence) {
@@ -153,7 +153,7 @@ String _ast_to_string(Arena *arena, AST* node, u8 op_precedence) {
         case AST_UNARYOP: {
             uint8_t current_op_precedence = op_type_precedence(node->binop.op);
 
-            String expr_string = _ast_to_string(arena, node->unaryop.operand, op_precedence);
+            String expr_string = _ast_to_string(allocator, node->unaryop.operand, op_precedence);
             const char *op_type_string = op_type_to_string(node->unaryop.op);
 
             if (current_op_precedence < op_precedence) {
@@ -166,7 +166,7 @@ String _ast_to_string(Arena *arena, AST* node, u8 op_precedence) {
 
         case AST_CALL: {
             if (node->func_call.args.size == 1) {
-                String arg_string = _ast_to_string(arena, node->func_call.args.data[0], op_precedence);
+                String arg_string = _ast_to_string(allocator, node->func_call.args.data[0], op_precedence);
                 sprintf(output.str, "%s(%s)", node->func_call.name.str, arg_string.str); break;
             } else {
                 // multiple args to string @todo
@@ -361,7 +361,7 @@ AST* interp_unaryop(Interp *ip, OpType op, AST *operand) {
         return interp(ip, REAL(-value));
     }
 
-    return init_ast_unaryop(ip->arena, operand, op);
+    return init_ast_unaryop(ip->allocator, operand, op);
 }
 
 AST* diff(Interp *ip, AST *expr, AST *var) {
@@ -410,7 +410,7 @@ AST *interp_sin(Interp *ip, AST* x) {
     }
     
     ASTArray args = {0};
-    ast_array_append(ip->arena, &args, x);
+    ast_array_append(ip->allocator, &args, x);
     return CALL(init_string("sin"), args);
 }
 
@@ -427,7 +427,7 @@ AST *interp_cos(Interp *ip, AST* x) {
     }
 
     ASTArray args = {0};
-    ast_array_append(ip->arena, &args, x);
+    ast_array_append(ip->allocator, &args, x);
     return CALL(init_string("cos"), args);
 }
 
@@ -438,7 +438,7 @@ AST *interp_tan(Interp *ip, AST* x) {
     }
     
     ASTArray args = {0};
-    ast_array_append(ip->arena, &args, x);
+    ast_array_append(ip->allocator, &args, x);
     return CALL(init_string("tan"), args);
 }
 
@@ -471,8 +471,8 @@ AST *interp_log(Interp *ip, AST *y, AST *b) {
     // TODO: implement maybe variadic function or macro to simplify ast array
     //       creation from with args given.
     ASTArray args = {0};
-    ast_array_append(ip->arena, &args, y);
-    ast_array_append(ip->arena, &args, b);
+    ast_array_append(ip->allocator, &args, y);
+    ast_array_append(ip->allocator, &args, b);
     return CALL(init_string("log"), args);
 }
 
@@ -487,7 +487,7 @@ AST* interp_sqrt(Interp *ip, AST *x) {
         if (is_perfect_square && x->integer.value % q == 0) {
             i32 p = x->integer.value / q;
             ASTArray new_args = {0};
-            ast_array_append(ip->arena, &new_args, INTEGER(p));
+            ast_array_append(ip->allocator, &new_args, INTEGER(p));
             AST *result = MUL(INTEGER((i64)sqrt_of_q), CALL(init_string("sqrt"), new_args));
             return interp(ip, result);
         }
@@ -505,7 +505,7 @@ AST* interp_sqrt(Interp *ip, AST *x) {
     // }
 
     ASTArray args = {0};
-    ast_array_append(ip->arena, &args, x);
+    ast_array_append(ip->allocator, &args, x);
     return CALL(init_string("sqrt"), args);
 }
 
@@ -519,11 +519,8 @@ AST* interp_call(Interp *ip, String name, ASTArray args) {
         assert(args.size == 1);
         return interp_sqrt(ip, args.data[0]);
     } else if (string_eq(name, init_string("ln"))) {
-        if (ast_match(args.data[0], SYMBOL(init_string("e")))) {
-            return INTEGER(1);
-        } else if (ast_match(args.data[0], INTEGER(1))) {
-            return INTEGER(0);
-        }
+        assert(args.size == 1);
+        return interp_log(ip, args.data[0], SYMBOL(init_string("e")));
     } else if (string_eq(name, init_string("log"))) {
         assert(args.size == 2);
         return interp_log(ip, args.data[0], args.data[1]);
@@ -540,7 +537,7 @@ AST* interp_call(Interp *ip, String name, ASTArray args) {
         AST* diff_var;
 
         if (args.size == 1) {
-            ASTArray nodes = ast_to_flat_array(ip->arena, args.data[0]);
+            ASTArray nodes = ast_to_flat_array(ip->allocator, args.data[0]);
             bool symbol_seen = false;
             AST *symbol;
             for (usize i = 0; i < nodes.size; i++) {

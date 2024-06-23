@@ -22,9 +22,9 @@ AST *parse_exp(Lexer *lexer) {
         case TOKEN_NUMBER:
             parser_eat(lexer, TOKEN_NUMBER);
             if (token.contains_dot) {
-                return init_ast_real(lexer->arena, strtod(token.text.str, NULL));
+                return init_ast_real(lexer->allocator, strtod(token.text.str, NULL));
             } else {
-                return init_ast_integer(lexer->arena, atoi(token.text.str));
+                return init_ast_integer(lexer->allocator, atoi(token.text.str));
             }
         case TOKEN_IDENTIFIER:
             if (is_builtin_function(token.text)) {
@@ -32,17 +32,17 @@ AST *parse_exp(Lexer *lexer) {
                 parser_eat(lexer, TOKEN_L_PAREN);
 
                 ASTArray args = {0};
-                ast_array_append(lexer->arena, &args, parse_expr(lexer));
+                ast_array_append(lexer->allocator, &args, parse_expr(lexer));
                 while (lexer_peek_token(lexer).type == TOKEN_COMMA) {
                     parser_eat(lexer, TOKEN_COMMA);
-                    ast_array_append(lexer->arena, &args, parse_expr(lexer));
+                    ast_array_append(lexer->allocator, &args, parse_expr(lexer));
                 }
 
                 parser_eat(lexer, TOKEN_R_PAREN);
-                return init_ast_call(lexer->arena, token.text, args);
+                return init_ast_call(lexer->allocator, token.text, args);
             } else {
                 parser_eat(lexer, TOKEN_IDENTIFIER);
-                return init_ast_symbol(lexer->arena, token.text);
+                return init_ast_symbol(lexer->allocator, token.text);
             }
         case TOKEN_L_PAREN:
             parser_eat(lexer, TOKEN_L_PAREN);
@@ -51,13 +51,13 @@ AST *parse_exp(Lexer *lexer) {
             return r;
         case TOKEN_MINUS:
             parser_eat(lexer, TOKEN_MINUS);
-            return init_ast_unaryop(lexer->arena, parse_factor(lexer), OP_USUB);
+            return init_ast_unaryop(lexer->allocator, parse_factor(lexer), OP_USUB);
         case TOKEN_PLUS:
             parser_eat(lexer, TOKEN_PLUS);
-            return init_ast_unaryop(lexer->arena, parse_factor(lexer), OP_UADD);
+            return init_ast_unaryop(lexer->allocator, parse_factor(lexer), OP_UADD);
         case TOKEN_EOF:
             // I think we can ignore EOF token for now and simply return it
-            return init_ast_empty(lexer->arena);
+            return init_ast_empty(lexer->allocator);
         default:
             printf("%s\n", token_type_to_string(token.type));
             assert(false);
@@ -74,7 +74,7 @@ AST *parse_factor(Lexer *lexer) {
         // parse_expr here. But unlike with addition and multiplication we want to parse pow operation
         // from right to left (this is more common, e.g. desmos, python, ...). 
         // For now I dont know if there are any edge cases, where this implementation is wrong.
-        result = init_ast_binop(lexer->arena, result, parse_factor(lexer), OP_POW);
+        result = init_ast_binop(lexer->allocator, result, parse_factor(lexer), OP_POW);
     }
 
     return result;
@@ -92,17 +92,17 @@ AST *parse_term(Lexer *lexer) {
         switch (lexer_peek_token(lexer).type) {
             case TOKEN_STAR:
                 parser_eat(lexer, TOKEN_STAR);
-                result = init_ast_binop(lexer->arena, result, parse_factor(lexer), OP_MUL);
+                result = init_ast_binop(lexer->allocator, result, parse_factor(lexer), OP_MUL);
                 break;
             case TOKEN_SLASH:
                 parser_eat(lexer, TOKEN_SLASH);
-                result = init_ast_binop(lexer->arena, result, parse_factor(lexer), OP_DIV);
+                result = init_ast_binop(lexer->allocator, result, parse_factor(lexer), OP_DIV);
                 break;
             case TOKEN_IDENTIFIER:
-                result = init_ast_binop(lexer->arena, result, parse_factor(lexer), OP_MUL);
+                result = init_ast_binop(lexer->allocator, result, parse_factor(lexer), OP_MUL);
                 break;
             case TOKEN_L_PAREN:
-                result = init_ast_binop(lexer->arena, result, parse_exp(lexer), OP_MUL);
+                result = init_ast_binop(lexer->allocator, result, parse_exp(lexer), OP_MUL);
                 break;
             default:
                 assert(false);
@@ -118,10 +118,10 @@ AST *parse_expr(Lexer* lexer) {
     while (lexer_peek_token(lexer).type == TOKEN_PLUS || lexer_peek_token(lexer).type == TOKEN_MINUS) {
         if (lexer_peek_token(lexer).type == TOKEN_PLUS) {
             parser_eat(lexer, TOKEN_PLUS);
-            result = init_ast_binop(lexer->arena, result, parse_term(lexer), OP_ADD);
+            result = init_ast_binop(lexer->allocator, result, parse_term(lexer), OP_ADD);
         } else if (lexer_peek_token(lexer).type == TOKEN_MINUS) {
             parser_eat(lexer, TOKEN_MINUS);
-            result = init_ast_binop(lexer->arena, result, parse_term(lexer), OP_SUB);
+            result = init_ast_binop(lexer->allocator, result, parse_term(lexer), OP_SUB);
         }
     }
 

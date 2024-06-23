@@ -65,8 +65,8 @@ u8 op_type_precedence(OpType type) {
     }
 }
 
-void ast_array_append(Arena *arena, ASTArray *array, AST *node) {
-    AST **new_data = arena_alloc(arena, sizeof(AST)*(array->size+1));
+void ast_array_append(Allocator *allocator, ASTArray *array, AST *node) {
+    AST **new_data = alloc(allocator, sizeof(AST)*(array->size+1));
 
     // currently we move old values to new_data because
     // there is no real realloc for arena @cleanup
@@ -79,29 +79,29 @@ void ast_array_append(Arena *arena, ASTArray *array, AST *node) {
     array->size++;
 };
 
-AST* init_ast_integer(Arena* arena, i64 value) {
-    AST* node = arena_alloc(arena, sizeof(AST));
+AST* init_ast_integer(Allocator* allocator, i64 value) {
+    AST* node = alloc(allocator, sizeof(AST));
     node->type = AST_INTEGER;
     node->integer.value = value;
     return node;
 }
 
-AST* init_ast_real(Arena* arena, f64 value) {
-    AST* node = arena_alloc(arena, sizeof(AST));
+AST* init_ast_real(Allocator* allocator, f64 value) {
+    AST* node = alloc(allocator, sizeof(AST));
     node->type = AST_REAL;
     node->real.value = value;
     return node;
 }
 
-AST* init_ast_symbol(Arena* arena, String name) {
-    AST *node = arena_alloc(arena, sizeof(AST));
+AST* init_ast_symbol(Allocator* allocator, String name) {
+    AST *node = alloc(allocator, sizeof(AST));
     node->type = AST_SYMBOL;
     node->symbol.name = name;
     return node;
 }
 
-AST* init_ast_binop(Arena* arena, AST* left, AST* right, OpType op) {
-    AST *node = arena_alloc(arena, sizeof(AST));
+AST* init_ast_binop(Allocator* allocator, AST* left, AST* right, OpType op) {
+    AST *node = alloc(allocator, sizeof(AST));
     node->type = AST_BINOP;
     node->binop.left = left;
     node->binop.right = right;
@@ -109,45 +109,45 @@ AST* init_ast_binop(Arena* arena, AST* left, AST* right, OpType op) {
     return node;
 }
 
-AST* init_ast_unaryop(Arena* arena, AST* operand, OpType op) {
-    AST *node = arena_alloc(arena, sizeof(AST));
+AST* init_ast_unaryop(Allocator* allocator, AST* operand, OpType op) {
+    AST *node = alloc(allocator, sizeof(AST));
     node->type = AST_UNARYOP;
     node->unaryop.operand = operand;
     node->unaryop.op = op;
     return node;
 }
 
-AST* init_ast_call(Arena* arena, String name, ASTArray args) {
-    AST *node = arena_alloc(arena, sizeof(AST));
+AST* init_ast_call(Allocator* allocator, String name, ASTArray args) {
+    AST *node = alloc(allocator, sizeof(AST));
     node->type = AST_CALL;
     node->func_call.name = name;
     node->func_call.args = args;
     return node;
 }
 
-AST* init_ast_empty(Arena* arena) {
-    AST* node = arena_alloc(arena, sizeof(AST));
+AST* init_ast_empty(Allocator* allocator) {
+    AST* node = alloc(allocator, sizeof(AST));
     node->type = AST_EMPTY;
     node->empty = true;
     return node;
 }
 
-void _ast_to_flat_array(Arena* arena, AST* ast, ASTArray* array) {
+void _ast_to_flat_array(Allocator* allocator, AST* ast, ASTArray* array) {
 
     switch (ast->type) {
         case AST_INTEGER:
         case AST_SYMBOL:
-            ast_array_append(arena, array, ast);
+            ast_array_append(allocator, array, ast);
             break;
         case AST_BINOP:
-            ast_array_append(arena, array, ast);
-            _ast_to_flat_array(arena, ast->binop.left, array);
-            _ast_to_flat_array(arena, ast->binop.right, array);
+            ast_array_append(allocator, array, ast);
+            _ast_to_flat_array(allocator, ast->binop.left, array);
+            _ast_to_flat_array(allocator, ast->binop.right, array);
             break;
         case AST_CALL:
-            ast_array_append(arena, array, ast);
+            ast_array_append(allocator, array, ast);
             for (usize i = 0; i < ast->func_call.args.size; i++) {
-                _ast_to_flat_array(arena, ast->func_call.args.data[i], array);
+                _ast_to_flat_array(allocator, ast->func_call.args.data[i], array);
             }
             break;
         default: 
@@ -157,10 +157,10 @@ void _ast_to_flat_array(Arena* arena, AST* ast, ASTArray* array) {
 
 }
 
-ASTArray ast_to_flat_array(Arena* arena, AST* ast) {
+ASTArray ast_to_flat_array(Allocator* allocator, AST* ast) {
     ASTArray array = {0};
 
-    _ast_to_flat_array(arena, ast, &array);
+    _ast_to_flat_array(allocator, ast, &array);
     return array;
 }
 

@@ -16,12 +16,14 @@ const Color COLOR_POMP_AND_POWER = {129, 110, 148, 255};
 const Color COLOR_CHESTNUT = {162, 73, 54, 255};
 
 void init_gui() {
+    SetTraceLogLevel(LOG_ERROR);
+
     String window_title = init_string("casc");
     i32 screen_width = 800;
     i32 screen_height = 600;
     usize cursor_position = 0;
 
-    Arena gui_arena = init_arena();
+    Allocator gui_allocator = init_allocator();
 
     String cell_input_buffer = init_string("");
 
@@ -64,15 +66,15 @@ void init_gui() {
         }
         
         if (c != 0) {
-            cell_input_buffer = string_insert(&gui_arena, cell_input_buffer, char_to_string(&gui_arena, c), cursor_position);
-            cursor_position++;
+            cell_input_buffer = string_insert(&gui_allocator, cell_input_buffer, char_to_string(&gui_allocator, c), cursor_position);
+            cursor_position += 1;
         } else if (IsKeyPressed(KEY_BACKSPACE) || IsKeyPressedRepeat(KEY_BACKSPACE)) {
             if (cursor_position > 0) {
                 i32 idx_to_delete = cursor_position-1;
                 cell_input_buffer = string_concat(
-                    &gui_arena,
-                    string_slice(&gui_arena, cell_input_buffer, 0, idx_to_delete),
-                    string_slice(&gui_arena, cell_input_buffer, idx_to_delete+1, cell_input_buffer.size)
+                    &gui_allocator,
+                    string_slice(&gui_allocator, cell_input_buffer, 0, idx_to_delete),
+                    string_slice(&gui_allocator, cell_input_buffer, idx_to_delete+1, cell_input_buffer.size)
                 );
                 cursor_position--;
             }
@@ -85,21 +87,24 @@ void init_gui() {
                 cursor_position += 1;
             }
         } else if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_ENTER)) {
-            Arena arena = init_arena();
+            Allocator allocator = init_allocator();
+
+            // printf("cell_input_buffer.size=%zu\n", cell_input_buffer.size);
             
             Lexer lexer = {0};
             lexer.source = cell_input_buffer;
-            lexer.arena = &arena;
+            lexer.allocator = &allocator;
 
             Interp ip;
-            ip.arena = &arena;
+            ip.allocator = &allocator;
 
             AST *output = parse(&lexer);
+            // print(ast_to_debug_string(&allocator, output));
             output = interp(&ip, output);
 
-            cell_output_buffer = ast_to_string(&gui_arena, output);
+            cell_output_buffer = ast_to_string(&gui_allocator, output);
 
-            arena_free(&arena);
+            free_allocator(&allocator);
         }
 
         //
@@ -118,7 +123,7 @@ void init_gui() {
         }
 #endif
 
-        Vector2 input_text_pos = { padding.x, padding.y, };
+        Vector2 input_text_pos = { padding.x, padding.y };
         DrawTextEx(font, cell_input_buffer.str, input_text_pos, font_size.y, 0, COLOR_DARK_GREEN);
 
         {
