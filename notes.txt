@@ -1,5 +1,6 @@
 ROADMAP
 - implement 'all' common features of a calculator
+  + e, pow, exp
 - implement 'all' functions from python math module
 - multiline statements including variables
 - multiple cells (first time kind of a notebook feel)

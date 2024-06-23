@@ -11,6 +11,51 @@
 AST *interp_binop_div(Interp*, AST*, AST*);
 AST *interp_binop(Interp*, AST*, AST*, OpType);
 
+const FunctionSignature BUILTIN_FUNCTIONS[] =  {
+    {"pow", 2}, {"exp", 1},
+    {"sqrt", 1},
+    {"sin", 1}, {"cos", 1}, {"tan", 1},
+    {"ln", 1},
+    {"log", 2},
+    {"exp", 1},
+    {"diff", 1}, {"diff", 2}
+};
+const usize BUILTIN_FUNCTIONS_COUNT = sizeof(BUILTIN_FUNCTIONS) / sizeof(FunctionSignature);
+
+const char *BUILTIN_CONSTANTS[] = {
+    "pi", "e"
+};
+const usize BUILTIN_CONSTANTS_COUNT = sizeof(BUILTIN_CONSTANTS) / sizeof(BUILTIN_CONSTANTS[0]);
+
+bool is_builtin_function(String s) {
+    for (usize i = 0; i < BUILTIN_FUNCTIONS_COUNT; i++) {
+        if (!strcmp(s.str, BUILTIN_FUNCTIONS[i].name)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool check_builtin_function_signature(String name, ASTArray args) {
+    for (usize i = 0; i < BUILTIN_FUNCTIONS_COUNT; i++) {
+        FunctionSignature signature = BUILTIN_FUNCTIONS[i];
+        if (string_eq(init_string(signature.name), name) && signature.args_count == args.size) {
+            // we found a signature that fits to the given one
+            return true;
+        } 
+    }
+
+    return false;
+}
+
+bool is_builtin_constant(String s) {
+    for (usize i = 0; i < BUILTIN_CONSTANTS_COUNT; i++) {
+        if (!strcmp(s.str, BUILTIN_CONSTANTS[i])) return true;
+    }  
+    return false;
+}
+
 bool ast_match(AST* left, AST* right) {
 
     if (left->type == right->type) {
@@ -515,23 +560,29 @@ AST* interp_call(Interp *ip, String name, ASTArray args) {
         args.data[i] = interp(ip, args.data[i]);
     }
 
-    if (string_eq(name, init_string("sqrt")) && args.data[0]->type == AST_INTEGER) {
-        assert(args.size == 1);
+    // check for builtin function and right signature
+    if (is_builtin_function(name)) {
+        bool success = check_builtin_function_signature(name, args);
+        if (!success) {
+            panic("Wrong amount of arguments.");
+        }
+    }
+    // Since here we know that the amount of args for any builtin
+    // function is right so we dont need any further checks for now.
+    // Maybe this will change in the future if we introduce any kind
+    // of typing in the function signatures.
+
+    if (string_eq(name, init_string("sqrt"))) {
         return interp_sqrt(ip, args.data[0]);
     } else if (string_eq(name, init_string("ln"))) {
-        assert(args.size == 1);
         return interp_log(ip, args.data[0], SYMBOL(init_string("e")));
     } else if (string_eq(name, init_string("log"))) {
-        assert(args.size == 2);
         return interp_log(ip, args.data[0], args.data[1]);
     } else if (string_eq(name, init_string("sin"))) {
-        assert(args.size == 1);
         return interp_sin(ip, args.data[0]);
     } else if (string_eq(name, init_string("cos"))) {
-        assert(args.size == 1);
         return interp_cos(ip, args.data[0]);
     } else if (string_eq(name, init_string("tan"))) {
-        assert(args.size == 1);
         return interp_tan(ip, args.data[0]);
     } else if (string_eq(name, init_string("diff"))) {
         AST* diff_var;

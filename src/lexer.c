@@ -7,30 +7,6 @@
 
 #include "casc.h"
 
-const char *BUILTIN_FUNCTIONS[] = {
-    "sqrt", "sin", "cos", "tan", "ln", "exp", "log", "diff"
-};
-const usize BUILTIN_FUNCTIONS_COUNT = sizeof(BUILTIN_FUNCTIONS) / sizeof(BUILTIN_FUNCTIONS[0]);
-
-const char *BUILTIN_CONSTANTS[] = {
-    "pi", "e"
-};
-const usize BUILTIN_CONSTANTS_COUNT = sizeof(BUILTIN_CONSTANTS) / sizeof(BUILTIN_CONSTANTS[0]);
-
-bool is_builtin_function(String s) {
-    for (usize i = 0; i < BUILTIN_FUNCTIONS_COUNT; i++) {
-        if (!strcmp(s.str, BUILTIN_FUNCTIONS[i])) return true;
-    }
-    return false;
-}
-
-bool is_builtin_constant(String s) {
-    for (usize i = 0; i < BUILTIN_CONSTANTS_COUNT; i++) {
-        if (!strcmp(s.str, BUILTIN_CONSTANTS[i])) return true;
-    }  
-    return false;
-}
-
 void lexer_print_tokens(Lexer *lexer) {
     Token token;
     do {
@@ -54,6 +30,7 @@ Token lexer_next_token(Lexer *lexer) {
     }
 
     if (isdigit(lexer_current_char(lexer))) {
+        // lex number
         String buffer = init_string("");
         while (isdigit(lexer_current_char(lexer)) || lexer_current_char(lexer) == '.') {
             char current_char = lexer_current_char(lexer);
@@ -76,7 +53,7 @@ Token lexer_next_token(Lexer *lexer) {
         token.text = buffer;
         return token;
     } else if (isalpha(lexer_current_char(lexer))) {
-        // collect alphanumeric chars into the buffer
+        // lex identifier
         String buffer = init_string("");
         usize first = lexer->pos;
         while (
@@ -89,19 +66,9 @@ Token lexer_next_token(Lexer *lexer) {
             lexer->pos += 1;
         }
 
-        if (is_builtin_function(buffer) || is_builtin_constant(buffer)) {
-            token.type = TOKEN_IDENTIFIER;
-            token.text = buffer;
-            return token;
-        // when not, every char becomes a seperate identifier token
-        } else {
-            lexer->pos = first;
-            token.type = TOKEN_IDENTIFIER;
-            char current_char = lexer_current_char(lexer);
-            token.text = char_to_string(lexer->allocator, current_char);
-            lexer->pos += 1;
-            return token;
-        }
+        token.type = TOKEN_IDENTIFIER;
+        token.text = buffer;
+        return token;
     } else if (lexer_current_char(lexer) == '+') {
         token.type = TOKEN_PLUS;
         token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));

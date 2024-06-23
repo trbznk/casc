@@ -47,14 +47,6 @@ void print(String s);
 // lexer
 //
 
-extern const char *BUILTIN_FUNCTIONS[];
-extern const usize BUILTIN_FUNCTIONS_COUNT;
-
-// maybe we treat 'constant' symbols like pi or e in the future as normal variables
-// that already have a value @todo @remove
-extern const char *BUILTIN_CONSTANTS[];
-extern const usize BUILTIN_CONSTANTS_COUNT;
-
 typedef enum {
     TOKEN_NUMBER,
     TOKEN_IDENTIFIER,
@@ -207,7 +199,6 @@ bool ast_is_numeric(AST*);
 
 f64 ast_to_f64(AST*);
 
-
 //
 // parser
 //
@@ -219,6 +210,18 @@ AST* parse_factor(Lexer*);
 //
 // interp
 //
+
+typedef struct FunctionSignature FunctionSignature;
+struct FunctionSignature {
+    const char *name;
+    usize args_count;
+};
+
+extern const FunctionSignature BUILTIN_FUNCTIONS[];
+extern const usize BUILTIN_FUNCTIONS_COUNT;
+
+extern const char *BUILTIN_CONSTANTS[];
+extern const usize BUILTIN_CONSTANTS_COUNT;
 
 typedef struct {
     Allocator *allocator;
