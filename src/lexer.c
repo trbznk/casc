@@ -113,6 +113,11 @@ Token lexer_next_token(Lexer *lexer) {
         token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
+    } else if (lexer_current_char(lexer) == '!') {
+        token.type = TOKEN_EXCLAMATION_MARK;
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
+        lexer->pos += 1;
+        return token;
     } else {
         fprintf(stderr, "ERROR: Can't tokenize '%c'\n", lexer_current_char(lexer));
         exit(1);

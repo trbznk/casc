@@ -15,9 +15,12 @@ const FunctionSignature BUILTIN_FUNCTIONS[] =  {
     {"pow", 2}, {"exp", 1},
     {"sqrt", 1},
     {"sin", 1}, {"cos", 1}, {"tan", 1},
+    {"asin", 1}, {"acos", 1}, {"atan", 1},
     {"ln", 1},
     {"log", 2},
     {"exp", 1},
+    {"abs", 1},
+    {"factorial", 1},
     {"diff", 1}, {"diff", 2}
 };
 const usize BUILTIN_FUNCTIONS_COUNT = sizeof(BUILTIN_FUNCTIONS) / sizeof(FunctionSignature);
@@ -492,6 +495,75 @@ AST *interp_tan(Interp *ip, AST* x) {
     return CALL(init_string("tan"), args);
 }
 
+AST *interp_asin(Interp *ip, AST* x) {
+    if (ast_is_numeric(x)) {
+        f64 value = ast_to_f64(x);
+        return interp(ip, REAL(asin(value)));
+    }
+    
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, x);
+    return CALL(init_string("asin"), args);
+}
+
+AST *interp_acos(Interp *ip, AST* x) {
+    if (ast_is_numeric(x)) {
+        f64 value = ast_to_f64(x);
+        return interp(ip, REAL(acos(value)));
+    }
+    
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, x);
+    return CALL(init_string("acos"), args);
+}
+
+AST *interp_atan(Interp *ip, AST* x) {
+    if (ast_is_numeric(x)) {
+        f64 value = ast_to_f64(x);
+        return interp(ip, REAL(atan(value)));
+    }
+    
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, x);
+    return CALL(init_string("atan"), args);
+}
+
+AST *interp_abs(Interp *ip, AST* x) {
+    if (ast_is_numeric(x)) {
+        f64 value = ast_to_f64(x);
+        if (value < 0) {
+            return interp(ip, REAL(-value));
+        } else {
+            return interp(ip, REAL(value));
+        }
+    }
+    
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, x);
+    return CALL(init_string("abs"), args);
+}
+
+AST *interp_factorial(Interp *ip, AST* n) {
+    if (n->type == AST_INTEGER) {
+        i64 value = n->integer.value;
+        if (value >= 0) {
+            i64 result = 1;
+            for (i64 m = 1; m <= value; m++) {
+                result *= m;
+            }
+            return interp(ip, INTEGER(result));
+        }
+    }
+    
+    if (ast_match(n, INTEGER(0))) {
+        return INTEGER(1);
+    }
+    
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, n);
+    return CALL(init_string("factorial"), args);
+}
+
 AST *interp_log(Interp *ip, AST *y, AST *b) {
     // log_b(y) = x
     // b^x = y
@@ -590,6 +662,16 @@ AST* interp_call(Interp *ip, String name, ASTArray args) {
         return interp_cos(ip, args.data[0]);
     } else if (string_eq(name, init_string("tan"))) {
         return interp_tan(ip, args.data[0]);
+    } else if (string_eq(name, init_string("asin"))) {
+        return interp_asin(ip, args.data[0]);
+    } else if (string_eq(name, init_string("acos"))) {
+        return interp_acos(ip, args.data[0]);
+    } else if (string_eq(name, init_string("atan"))) {
+        return interp_atan(ip, args.data[0]);
+    } else if (string_eq(name, init_string("abs"))) {
+        return interp_abs(ip, args.data[0]);
+    } else if (string_eq(name, init_string("factorial"))) {
+        return interp_factorial(ip, args.data[0]);
     } else if (string_eq(name, init_string("pow"))) {
         return interp(ip, POW(args.data[0], args.data[1]));
     } else if (string_eq(name, init_string("exp"))) {

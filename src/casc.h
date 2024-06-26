@@ -61,6 +61,7 @@ typedef enum {
 
     TOKEN_COMMA,
     TOKEN_HASH,
+    TOKEN_EXCLAMATION_MARK,
 
     TOKEN_EOF,
 

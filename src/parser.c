@@ -18,15 +18,21 @@ void parser_eat(Lexer *lexer, TokenType type) {
 AST *parse_exp(Lexer *lexer) {
     Token token = lexer_peek_token(lexer);
 
+    AST *result = NULL;
+
     switch (token.type) {
-        case TOKEN_NUMBER:
+
+        case TOKEN_NUMBER: {
             parser_eat(lexer, TOKEN_NUMBER);
             if (token.contains_dot) {
-                return init_ast_real(lexer->allocator, strtod(token.text.str, NULL));
+                result = init_ast_real(lexer->allocator, strtod(token.text.str, NULL));
             } else {
-                return init_ast_integer(lexer->allocator, atoi(token.text.str));
+                result = init_ast_integer(lexer->allocator, atoi(token.text.str));
             }
-        case TOKEN_IDENTIFIER:
+            break;
+        }
+
+        case TOKEN_IDENTIFIER: {
             if (is_builtin_function(token.text)) {
                 parser_eat(lexer, TOKEN_IDENTIFIER);
                 parser_eat(lexer, TOKEN_L_PAREN);
@@ -39,30 +45,58 @@ AST *parse_exp(Lexer *lexer) {
                 }
 
                 parser_eat(lexer, TOKEN_R_PAREN);
-                return init_ast_call(lexer->allocator, token.text, args);
+                result = init_ast_call(lexer->allocator, token.text, args);
             } else {
                 parser_eat(lexer, TOKEN_IDENTIFIER);
-                return init_ast_symbol(lexer->allocator, token.text);
+                result = init_ast_symbol(lexer->allocator, token.text);
             }
-        case TOKEN_L_PAREN:
+            break;
+        }
+
+        case TOKEN_L_PAREN: {
             parser_eat(lexer, TOKEN_L_PAREN);
-            AST* r = parse_expr(lexer);
+            result = parse_expr(lexer);
             parser_eat(lexer, TOKEN_R_PAREN);
-            return r;
-        case TOKEN_MINUS:
+            break;
+        }
+
+        case TOKEN_MINUS: {
             parser_eat(lexer, TOKEN_MINUS);
-            return init_ast_unaryop(lexer->allocator, parse_factor(lexer), OP_USUB);
-        case TOKEN_PLUS:
+            result = init_ast_unaryop(lexer->allocator, parse_factor(lexer), OP_USUB);
+            break;
+        }
+
+        case TOKEN_PLUS: {
             parser_eat(lexer, TOKEN_PLUS);
-            return init_ast_unaryop(lexer->allocator, parse_factor(lexer), OP_UADD);
-        case TOKEN_EOF:
+            result = init_ast_unaryop(lexer->allocator, parse_factor(lexer), OP_UADD);
+            break;
+        }
+
+        case TOKEN_EOF: {
             // I think we can ignore EOF token for now and simply return it
-            return init_ast_empty(lexer->allocator);
-        default:
+            result = init_ast_empty(lexer->allocator);
+            break;
+        }
+
+        default: {
             printf("%s\n", token_type_to_string(token.type));
             assert(false);
+        }
+
     }
 
+    assert(result != NULL);
+
+    // !
+    if (lexer_peek_token(lexer).type == TOKEN_EXCLAMATION_MARK) {
+        parser_eat(lexer, TOKEN_EXCLAMATION_MARK);
+
+        ASTArray args = {0};
+        ast_array_append(lexer->allocator, &args, result);
+        result = init_ast_call(lexer->allocator, init_string("factorial"), args);
+    }
+
+    return result;
 }
 
 AST *parse_factor(Lexer *lexer) {
