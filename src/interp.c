@@ -530,16 +530,17 @@ AST* interp_sqrt(Interp *ip, AST *x) {
     // check for perfect square for simplifying
     //
     // TODO: this is probably an inefficient way to compute the biggest perfect sqaure factor of a given number
-    // TODO: tranform this into f64
-    for (i32 q = x->integer.value; q > 1; q--) {
-        double sqrt_of_q = sqrtf((double)q);
-        bool is_perfect_square = sqrt_of_q == floor(sqrt_of_q);
-        if (is_perfect_square && x->integer.value % q == 0) {
-            i32 p = x->integer.value / q;
-            ASTArray new_args = {0};
-            ast_array_append(ip->allocator, &new_args, INTEGER(p));
-            AST *result = MUL(INTEGER((i64)sqrt_of_q), CALL(init_string("sqrt"), new_args));
-            return interp(ip, result);
+    if (x->type == AST_INTEGER) {
+        for (i32 q = x->integer.value; q > 1; q--) {
+            double sqrt_of_q = sqrtf((double)q);
+            bool is_perfect_square = sqrt_of_q == floor(sqrt_of_q);
+            if (is_perfect_square && x->integer.value % q == 0) {
+                i32 p = x->integer.value / q;
+                ASTArray new_args = {0};
+                ast_array_append(ip->allocator, &new_args, INTEGER(p));
+                AST *result = MUL(INTEGER((i64)sqrt_of_q), CALL(init_string("sqrt"), new_args));
+                return interp(ip, result);
+            }
         }
     }
 

@@ -4,3 +4,5 @@ ROADMAP
 - multiline statements including variables
 - multiple cells (first time kind of a notebook feel)
 - now we need to finally make a 'complete' text editor (highlighting, copy, paste, ...)
+
+BUGS
