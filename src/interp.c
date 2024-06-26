@@ -22,6 +22,7 @@ const FunctionSignature BUILTIN_FUNCTIONS[] =  {
     {"abs", 1},
     {"factorial", 1},
     {"npr", 2}, {"ncr", 2},
+    {"gcd", 2}, {"lcm", 2},
     {"diff", 1}, {"diff", 2}
 };
 const usize BUILTIN_FUNCTIONS_COUNT = sizeof(BUILTIN_FUNCTIONS) / sizeof(FunctionSignature);
@@ -60,12 +61,28 @@ bool is_builtin_constant(String s) {
     return false;
 }
 
+//
+// math
+//
+
 i64 factorial(i64 n) {
     i64 result = 1;
     for (i64 m = 1; m <= n; m++) {
         result *= m;
     }
     return result;
+}
+
+i64 gcd(i64 a, i64 b) {
+    // Euclidean algorithm - https://en.wikipedia.org/wiki/Euclidean_algorithm
+    
+    while (b != 0) {
+        i64 t = b;
+        b = a % b;
+        a = t;
+    }
+
+    return a;
 }
 
 bool ast_match(AST* left, AST* right) {
@@ -615,6 +632,36 @@ AST *interp_ncr(Interp *ip, AST *n, AST *k) {
     return CALL(init_string("ncr"), args);
 }
 
+AST *interp_gcd(Interp *ip, AST *a_ast, AST *b_ast) {
+    // TODO: implement multiple args for this function (see python math module) @same20240626
+    
+    if (a_ast->type == AST_INTEGER && b_ast->type == AST_INTEGER) {
+        return INTEGER(gcd(a_ast->integer.value, b_ast->integer.value));
+    }
+
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, a_ast);
+    ast_array_append(ip->allocator, &args, b_ast);
+    return CALL(init_string("gcd"), args);
+}
+
+AST *interp_lcm(Interp *ip, AST *a_ast, AST *b_ast) {
+    // TODO: implement multiple args for this function (see python math module) @same20240626
+
+    if (a_ast->type == AST_INTEGER && b_ast->type == AST_INTEGER) {
+        // LCM formula - https://en.wikipedia.org/wiki/Least_common_multiple
+        i64 a = a_ast->integer.value;
+        i64 b = b_ast->integer.value;
+        i64 result = llabs(a*b) / gcd(a, b);
+        return INTEGER(result);
+    }
+
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, a_ast);
+    ast_array_append(ip->allocator, &args, b_ast);
+    return CALL(init_string("lcm"), args);
+}
+
 AST *interp_log(Interp *ip, AST *y, AST *b) {
     // log_b(y) = x
     // b^x = y
@@ -727,6 +774,10 @@ AST* interp_call(Interp *ip, String name, ASTArray args) {
         return interp_npr(ip, args.data[0], args.data[1]);
     } else if (string_eq(name, init_string("ncr"))) {
         return interp_ncr(ip, args.data[0], args.data[1]);
+    } else if (string_eq(name, init_string("gcd"))) {
+        return interp_gcd(ip, args.data[0], args.data[1]);
+    } else if (string_eq(name, init_string("lcm"))) {
+        return interp_lcm(ip, args.data[0], args.data[1]);
     } else if (string_eq(name, init_string("pow"))) {
         return interp(ip, POW(args.data[0], args.data[1]));
     } else if (string_eq(name, init_string("exp"))) {
