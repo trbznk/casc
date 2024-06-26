@@ -10,3 +10,4 @@ TODO
 
 BUGS
 - double !
+- right shift enter not working

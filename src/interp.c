@@ -21,6 +21,7 @@ const FunctionSignature BUILTIN_FUNCTIONS[] =  {
     {"exp", 1},
     {"abs", 1},
     {"factorial", 1},
+    {"npr", 2}, {"ncr", 2},
     {"diff", 1}, {"diff", 2}
 };
 const usize BUILTIN_FUNCTIONS_COUNT = sizeof(BUILTIN_FUNCTIONS) / sizeof(FunctionSignature);
@@ -57,6 +58,14 @@ bool is_builtin_constant(String s) {
         if (!strcmp(s.str, BUILTIN_CONSTANTS[i])) return true;
     }  
     return false;
+}
+
+i64 factorial(i64 n) {
+    i64 result = 1;
+    for (i64 m = 1; m <= n; m++) {
+        result *= m;
+    }
+    return result;
 }
 
 bool ast_match(AST* left, AST* right) {
@@ -543,25 +552,67 @@ AST *interp_abs(Interp *ip, AST* x) {
     return CALL(init_string("abs"), args);
 }
 
-AST *interp_factorial(Interp *ip, AST* n) {
-    if (n->type == AST_INTEGER) {
-        i64 value = n->integer.value;
-        if (value >= 0) {
-            i64 result = 1;
-            for (i64 m = 1; m <= value; m++) {
-                result *= m;
-            }
-            return interp(ip, INTEGER(result));
-        }
-    }
-    
+AST *interp_factorial(Interp *ip, AST *n) {
+    // 0!
     if (ast_match(n, INTEGER(0))) {
         return INTEGER(1);
+    }
+
+    if (n->type == AST_INTEGER) {
+        i64 value = n->integer.value;
+
+        // TODO: error handling
+        assert(value > 0);
+
+        return interp(ip, INTEGER(factorial(value)));
     }
     
     ASTArray args = {0};
     ast_array_append(ip->allocator, &args, n);
     return CALL(init_string("factorial"), args);
+}
+
+AST *interp_npr(Interp *ip, AST *n, AST *k) {
+
+    if (n->type == AST_INTEGER && k->type == AST_INTEGER) {
+        i64 n_value = n->integer.value;
+        i64 k_value = k->integer.value;
+        
+        // TODO: proper error handling
+        assert(n_value >= 0);
+        assert(k_value >= 0);
+        assert(k_value <= n_value);
+
+        return interp(ip, DIV(INTEGER(factorial(n_value)), INTEGER(factorial(n_value-k_value))));
+    }
+
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, n);
+    ast_array_append(ip->allocator, &args, k);
+    return CALL(init_string("npr"), args);
+}
+
+AST *interp_ncr(Interp *ip, AST *n, AST *k) {
+
+    if (n->type == AST_INTEGER && k->type == AST_INTEGER) {
+        i64 n_value = n->integer.value;
+        i64 k_value = k->integer.value;
+        
+        // TODO: proper error handling
+        assert(n_value >= 0);
+        assert(k_value >= 0);
+        assert(k_value <= n_value);
+
+        AST *nominator = INTEGER(factorial(n_value));
+        AST *denominator = MUL(INTEGER(factorial(n_value-k_value)), INTEGER(factorial(k_value)));
+
+        return interp(ip, DIV(nominator, denominator));
+    }
+
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, n);
+    ast_array_append(ip->allocator, &args, k);
+    return CALL(init_string("ncr"), args);
 }
 
 AST *interp_log(Interp *ip, AST *y, AST *b) {
@@ -672,6 +723,10 @@ AST* interp_call(Interp *ip, String name, ASTArray args) {
         return interp_abs(ip, args.data[0]);
     } else if (string_eq(name, init_string("factorial"))) {
         return interp_factorial(ip, args.data[0]);
+    } else if (string_eq(name, init_string("npr"))) {
+        return interp_npr(ip, args.data[0], args.data[1]);
+    } else if (string_eq(name, init_string("ncr"))) {
+        return interp_ncr(ip, args.data[0], args.data[1]);
     } else if (string_eq(name, init_string("pow"))) {
         return interp(ip, POW(args.data[0], args.data[1]));
     } else if (string_eq(name, init_string("exp"))) {
