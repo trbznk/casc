@@ -185,14 +185,6 @@ AST *parse_program(Lexer *lexer) {
     AST *prog = init_ast_program(lexer->allocator);
 
     while (lexer_peek_token(lexer).type != TOKEN_EOF) {
-
-        // ignore empty lines
-        // TODO: this makes parsing maybe more error prune.
-        //       Maybe we move this into the lexer (shrinking newlines and spaces that come together)
-        while (lexer_peek_token(lexer).type == TOKEN_NEW_LINE) {
-            parser_eat(lexer, TOKEN_NEW_LINE);
-        }
-
         AST *result = parse_assign(lexer);
         ast_array_append(lexer->allocator, &prog->program.statements, result);
     }

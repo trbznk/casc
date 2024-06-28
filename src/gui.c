@@ -1,3 +1,5 @@
+// TODO: repeating keys (ENTER, LEFT ARROW, RIGHT ARROW) not working
+
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -281,25 +283,14 @@ void init_gui() {
         }
 #endif
 
-        // input text
-        // {
-        //     Vector2 input_text_pos = { padding.x, padding.y };
-        //     DrawTextEx(font, cell_input_buffer.str, input_text_pos, font_size.y, 0, COLOR_DARK_GREEN);
-        // }
-
-        // DrawLine(0, line_height, screen_width, line_height, COLOR_MOONSTONE);
-
-        // output text
-        // if (cell_output_buffer.size > 0) {
-        //     Vector2 output_text_pos = { padding.x, line_height + padding.y };
-        //     DrawTextEx(font, cell_output_buffer.str, output_text_pos, font_size.y, 2, COLOR_DARK_GREEN);
-        // }
-
         // cells
         {
             i32 current_y = 0;
 
             for (usize i = 0; i < gui.cells.size; i++) {
+
+                DrawLine(0, current_y, screen_width, current_y, PINK);
+
                 Cell cell = gui.cells.data[i];
 
                 switch (cell.type) {
@@ -314,10 +305,23 @@ void init_gui() {
 
                         Vector2 pos = { padding.x, padding.y };
                         i32 cell_height = padding.y + (font_size.y*lines_count) + padding.y;
-                        DrawRectangle(0, 0, screen_width, cell_height, LIGHTGRAY);
+                        i32 cell_width_without_padding = screen_width - 2*padding.x;
+                        i32 cell_height_without_padding = cell_height - 2*padding.y;
+                        DrawRectangleLines(padding.x, current_y+padding.y, cell_width_without_padding, cell_height_without_padding, PINK);
                         DrawTextEx(font, cell.content.str, pos, font_size.y, 0, COLOR_DARK_GREEN);
 
                         current_y += cell_height;
+
+                        // cursor
+
+                        // cursor pos -> row,col
+                        usize row = cursor_get_row(gui.cursor, cell.content);
+                        usize col = cursor_get_col(gui.cursor, cell.content);
+
+                        i32 x = padding.x + font_size.x * col;
+                        i32 y = padding.y + font_size.y * row;
+                        DrawRectangle(x, y, font_size.x/8, font_size.y, COLOR_POMP_AND_POWER);
+
                         break;
                     }
 
@@ -334,27 +338,6 @@ void init_gui() {
                 }
 
             }
-        }
-
-        // cursor
-        {
-            Cell cell = gui.cells.data[0];
-
-            // cursor pos -> row,col
-            usize row = 0;
-            usize col = 0;
-            for (usize i = 0; i < gui.cursor.pos; i++) {
-                if (cell.content.str[i] == '\n') {
-                    col = 0;
-                    row += 1;
-                } else {
-                    col += 1;
-                }
-            }
-
-            i32 x = padding.x + font_size.x * col;
-            i32 y = padding.y + font_size.y * row;
-            DrawRectangle(x, y, font_size.x/8, font_size.y, COLOR_POMP_AND_POWER);
         }
 
         EndDrawing();

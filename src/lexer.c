@@ -112,6 +112,11 @@ Token lexer_next_token(Lexer *lexer) {
         token.type = TOKEN_NEW_LINE;
         token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
+
+        while (isspace(lexer_current_char(lexer))) {
+            lexer->pos += 1;
+        }
+
         return token;
     } else if (lexer_current_char(lexer) == ',') {
         token.type = TOKEN_COMMA;
