@@ -37,6 +37,8 @@ const char* op_type_to_string(OpType type) {
 // TODO: return string
 const char* ast_type_to_debug_string(ASTType type) {
     switch (type) {
+        case AST_PROGRAM: return "Program";
+        case AST_ASSIGN: return "Assign";
         case AST_INTEGER: return "Integer";
         case AST_REAL: return "Real";
         case AST_SYMBOL: return "Symbol";
@@ -131,6 +133,22 @@ AST* init_ast_call(Allocator* allocator, String name, ASTArray args) {
     node->type = AST_CALL;
     node->func_call.name = name;
     node->func_call.args = args;
+    return node;
+}
+
+AST* init_ast_program(Allocator* allocator) {
+    AST *node = alloc(allocator, sizeof(AST));
+    node->type = AST_PROGRAM;
+    node->program.statements.data = NULL;
+    node->program.statements.size = 0;
+    return node;
+}
+
+AST* init_ast_assign(Allocator* allocator, AST *target, AST *value) {
+    AST *node = alloc(allocator, sizeof(AST));
+    node->type = AST_ASSIGN;
+    node->assign.target = target;
+    node->assign.value = value;
     return node;
 }
 

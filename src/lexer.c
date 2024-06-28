@@ -104,12 +104,22 @@ Token lexer_next_token(Lexer *lexer) {
         token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
-    } else if (isspace(lexer_current_char(lexer))) {
-        // ignore spaces for now
+    } else if (lexer_current_char(lexer) == ' ') {
+        // we dont use the isspace() function here because its although true for \n char
         lexer->pos += 1;
         return lexer_next_token(lexer);
+    } else if (lexer_current_char(lexer) == '\n') {
+        token.type = TOKEN_NEW_LINE;
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
+        lexer->pos += 1;
+        return token;
     } else if (lexer_current_char(lexer) == ',') {
         token.type = TOKEN_COMMA;
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
+        lexer->pos += 1;
+        return token;
+    } else if (lexer_current_char(lexer) == '=') {
+        token.type = TOKEN_EQUAL;
         token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
@@ -148,6 +158,7 @@ const char *token_type_to_string(TokenType type) {
         case TOKEN_R_PAREN: return "R_PAREN";
         case TOKEN_HASH: return "HASH";
         case TOKEN_COMMA: return "COMMA";
+        case TOKEN_NEW_LINE: return "NEW_LINE";
         case TOKEN_EOF: return "EOF";
         default:
             printf("%d\n", type); 

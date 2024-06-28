@@ -815,16 +815,69 @@ AST* interp_call(Interp *ip, String name, ASTArray args) {
 }
 
 AST *interp_symbol(Interp *ip, String name) {
+
     // here comes the check for defined variables in the future
     if (is_builtin_constant(name)) {
         return CONSTANT(name);
     }
 
+    // check if its a defined variable
+    for (usize i = 0; i < ip->variables_count; i++) {
+        Variable var = ip->variables[i];
+        if (string_eq(name, var.name)) {
+            return var.value;
+        }
+    }
+
     return SYMBOL(name);
+}
+
+AST *interp_program(Interp *ip, ASTArray statements) {
+    assert(statements.size > 0);
+
+    AST *last_result = NULL;
+    for (usize i = 0; i < statements.size; i++) {
+        // TODO: implement 'ans' here
+        last_result = interp(ip, statements.data[i]);
+    }
+
+    assert(last_result != NULL);
+
+    return last_result;
+}
+
+AST *interp_assign(Interp *ip, AST *target, AST *value) {
+    // depth first
+    value = interp(ip, value);
+
+    assert(target->type == AST_SYMBOL); // why should something different be on the left side?
+
+    String name = target->symbol.name;
+
+    // check if variable already exists
+    printf("variables_count=%zu\n", ip->variables_count);
+    for (usize i = 0; i < ip->variables_count; i++) {
+        if (string_eq(name, ip->variables[i].name)) {
+            // overwriting old value with new value
+            ip->variables[i].value = value;
+            return EMPTY();
+        }
+    }
+
+    // variable does not exists
+    ip->variables[ip->variables_count].name = name;
+    ip->variables[ip->variables_count].value = value;
+    ip->variables_count += 1;
+
+    assert(ip->variables_count <= MAX_VARIABLES);
+
+    return EMPTY();
 }
 
 AST *interp(Interp *ip, AST* node) {
     switch (node->type) {
+        case AST_PROGRAM:
+            return interp_program(ip, node->program.statements);
         case AST_BINOP:
             return interp_binop(ip, node->binop.left, node->binop.right, node->binop.op);
         case AST_UNARYOP:
@@ -844,10 +897,14 @@ AST *interp(Interp *ip, AST* node) {
         }
         case AST_CALL:
             return interp_call(ip, node->func_call.name, node->func_call.args);
+        case AST_ASSIGN:
+            return interp_assign(ip, node->assign.target, node->assign.value);
         case AST_EMPTY:
             return node;
         default:
             fprintf(stderr, "%s:%d: Cannot interp node type '%s'\n", __FILE__, __LINE__, ast_type_to_debug_string(node->type));
             exit(1);
     }
+
+    todo();
 }

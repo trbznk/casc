@@ -315,6 +315,8 @@ void test() {
 
         free_allocator(&allocator);
     }
+
+    printf("TESTS DONE!\n");
 }
 
 void main_cli() {

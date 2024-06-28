@@ -2,6 +2,8 @@
 
 #include <stdlib.h>
 
+#define MAX_VARIABLES 1024
+
 //
 // forward declarations
 //
@@ -56,6 +58,8 @@ typedef enum {
     TOKEN_SLASH,
     TOKEN_CARET,
 
+    TOKEN_EQUAL,
+
     TOKEN_L_PAREN,
     TOKEN_R_PAREN,
 
@@ -63,6 +67,7 @@ typedef enum {
     TOKEN_HASH,
     TOKEN_EXCLAMATION_MARK,
 
+    TOKEN_NEW_LINE,
     TOKEN_EOF,
 
     TOKEN_TYPE_COUNT
@@ -107,6 +112,8 @@ bool is_builtin_constant(String);
 #define DIV(left, right) init_ast_binop(ip->allocator, left, right, OP_DIV)
 #define POW(left, right) init_ast_binop(ip->allocator, left, right, OP_POW)
 #define CALL(name, args) init_ast_call(ip->allocator, name, args)
+#define ASSIGN(target, value) init_ast_assign(ip->allocator, target, value)
+#define EMPTY() init_ast_empty(ip->allocator)
 
 typedef struct ASTArray ASTArray;
 
@@ -124,6 +131,8 @@ typedef enum {
 } OpType;
 
 typedef enum {
+    AST_PROGRAM,
+
     AST_INTEGER,
     AST_REAL,
     AST_SYMBOL,
@@ -132,8 +141,8 @@ typedef enum {
     AST_UNARYOP,
 
     AST_CALL,
+    AST_ASSIGN,
 
-    // TODO: AST_EMPTY type when there are more high level nodes like NODE_PROGRAMM or something similar
     AST_EMPTY,
 
     AST_TYPE_COUNT
@@ -180,10 +189,21 @@ struct AST {
             ASTArray args;
         } func_call;
 
+        struct {
+            AST *target;
+            AST *value;
+        } assign;
+
+        struct {
+            ASTArray statements;
+        } program;
+
         bool empty; // TODO: temporary for ASTType empty
     };
 };
 
+AST* init_ast_program(Allocator*);
+AST* init_ast_assign(Allocator*, AST *target, AST *value);
 AST* init_ast_integer(Allocator*, i64);
 AST* init_ast_real(Allocator*, f64);
 AST* init_ast_symbol(Allocator*, String);
@@ -235,8 +255,17 @@ extern const usize BUILTIN_FUNCTIONS_COUNT;
 extern const char *BUILTIN_CONSTANTS[];
 extern const usize BUILTIN_CONSTANTS_COUNT;
 
+typedef struct  {
+    String name;
+    AST *value;
+} Variable;
+
 typedef struct {
     Allocator *allocator;
+
+    // TODO: maybe put the variables on the heap
+    Variable variables[MAX_VARIABLES];
+    usize variables_count;
 } Interp;
 
 AST *interp(Interp*, AST*);

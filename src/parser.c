@@ -162,8 +162,39 @@ AST *parse_expr(Lexer* lexer) {
     return result;
 }
 
+AST *parse_assign(Lexer *lexer) {
+    AST *result = parse_expr(lexer);
+
+    if (lexer_peek_token(lexer).type == TOKEN_EQUAL) {
+        parser_eat(lexer, TOKEN_EQUAL);
+        AST *value = parse_expr(lexer);
+        
+        switch (lexer_peek_token(lexer).type) {
+            case TOKEN_NEW_LINE: parser_eat(lexer, TOKEN_NEW_LINE); break;
+            case TOKEN_EOF: parser_eat(lexer, TOKEN_EOF); break;
+            default: todo(); // what should we expect different after assign then 'newline' or 'eof'?
+        }
+
+        return init_ast_assign(lexer->allocator, result, value);
+    }
+
+    return result;
+}
+
+AST *parse_program(Lexer *lexer) {
+    AST *prog = init_ast_program(lexer->allocator);
+
+    while (lexer_peek_token(lexer).type != TOKEN_EOF) {
+        AST *result = parse_assign(lexer);
+        ast_array_append(lexer->allocator, &prog->program.statements, result);
+    }
+
+    return prog;
+}
+
 AST *parse(Lexer *lexer) {
-    AST* result = parse_expr(lexer);
+    AST* result = parse_program(lexer);
+    // printf("%s\n", token_type_to_string(lexer_peek_token(lexer).type));
     assert(lexer_peek_token(lexer).type == TOKEN_EOF);
     return result;
 }

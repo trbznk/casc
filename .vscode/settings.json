@@ -12,6 +12,8 @@
         "__config": "c",
         "math.h": "c",
         "ios": "c",
-        "complex": "c"
+        "complex": "c",
+        "cstdlib": "c",
+        "locale": "c"
     }
 }
