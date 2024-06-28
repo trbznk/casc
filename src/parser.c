@@ -168,14 +168,14 @@ AST *parse_assign(Lexer *lexer) {
     if (lexer_peek_token(lexer).type == TOKEN_EQUAL) {
         parser_eat(lexer, TOKEN_EQUAL);
         AST *value = parse_expr(lexer);
-        
-        switch (lexer_peek_token(lexer).type) {
-            case TOKEN_NEW_LINE: parser_eat(lexer, TOKEN_NEW_LINE); break;
-            case TOKEN_EOF: parser_eat(lexer, TOKEN_EOF); break;
-            default: todo(); // what should we expect different after assign then 'newline' or 'eof'?
-        }
 
-        return init_ast_assign(lexer->allocator, result, value);
+        result = init_ast_assign(lexer->allocator, result, value);
+    }
+
+    switch (lexer_peek_token(lexer).type) {
+        case TOKEN_NEW_LINE: parser_eat(lexer, TOKEN_NEW_LINE); break;
+        case TOKEN_EOF: parser_eat(lexer, TOKEN_EOF); break;
+        default: todo(); // what should we expect different after assign then 'newline' or 'eof'?
     }
 
     return result;
@@ -185,6 +185,14 @@ AST *parse_program(Lexer *lexer) {
     AST *prog = init_ast_program(lexer->allocator);
 
     while (lexer_peek_token(lexer).type != TOKEN_EOF) {
+
+        // ignore empty lines
+        // TODO: this makes parsing maybe more error prune.
+        //       Maybe we move this into the lexer (shrinking newlines and spaces that come together)
+        while (lexer_peek_token(lexer).type == TOKEN_NEW_LINE) {
+            parser_eat(lexer, TOKEN_NEW_LINE);
+        }
+
         AST *result = parse_assign(lexer);
         ast_array_append(lexer->allocator, &prog->program.statements, result);
     }

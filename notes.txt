@@ -6,6 +6,7 @@ ROADMAP
 - now we need to finally make a 'complete' text editor (highlighting, copy, paste, ...)
 
 TODO
+- test record feature
 - for which values functions like sqrt, log are defined (needs to be checked)
 
 BUGS

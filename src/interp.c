@@ -855,7 +855,6 @@ AST *interp_assign(Interp *ip, AST *target, AST *value) {
     String name = target->symbol.name;
 
     // check if variable already exists
-    printf("variables_count=%zu\n", ip->variables_count);
     for (usize i = 0; i < ip->variables_count; i++) {
         if (string_eq(name, ip->variables[i].name)) {
             // overwriting old value with new value

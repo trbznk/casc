@@ -176,10 +176,8 @@ void init_gui() {
 
     InitWindow(screen_width, screen_height, window_title.str);
 
-    // Font font = LoadFontEx("./fonts/monaspace-v1.101/fonts/otf/MonaspaceNeon-Regular.otf", 96, 0, 0);
-    // Font font = LoadFontEx("./fonts/PkgTTF-Iosevka-30/Iosevka-Regular.ttf", 96, 0, 0);
     Font font = LoadFontEx("./fonts/liberation_mono/LiberationMono-Regular.ttf", 96, 0, 0);
-    Vector2 font_size = MeasureTextEx(font, "i", 48, 0);
+    Vector2 font_size = MeasureTextEx(font, "i", 32, 0);
     Vector2 padding = { font_size.x/2, font_size.y/4 };
     float line_height = font_size.y + 2*padding.y;
     (void) line_height;

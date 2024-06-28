@@ -290,6 +290,7 @@ void init_gui();
 
 #define panic(msg) fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, msg); exit(1);
 #define todo() panic("not implemented");
+#define mark(i) printf("... MARK %d\n", i); 
 
 struct Arena {
     void *memory;

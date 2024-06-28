@@ -290,6 +290,8 @@ void test() {
     test_ast("1/8 + 1", "9/8");
     test_ast("sin(4/5)*2-5.2/4", "0.134712");
     test_ast("log(8, 2)", "3");
+    test_ast("x = 4\ny = 3\nx\nx*y+4", "16");
+    test_ast("x = 4\n     3\n\n \n   \ny = 3\n\nx\n\n\n\n\n\n\nx*y+4", "16");
 
     printf("\n\n");
 
