@@ -311,10 +311,62 @@ AST* interp_binop_add(Interp *ip, AST *left, AST *right) {
         }
     }
     
+    // compute numeric
     if (ast_is_numeric(left) && ast_is_numeric(right)) {
         return interp(ip, REAL(ast_to_f64(left)+ast_to_f64(right)));
     }
-    
+
+    // +- with numbers
+    if (ast_is_numeric(right)) {
+        f64 value = ast_to_f64(right);
+        if (value < 0.0) {
+            switch (right->type) {
+                
+                case AST_INTEGER: {
+                    i64 new_value = labs(right->integer.value);
+                    return SUB(left, INTEGER(new_value));
+                }
+
+                case AST_REAL: {
+                    f64 new_value = -1.0 * right->real.value;
+                    return SUB(left, REAL(new_value));
+                }
+
+                case AST_BINOP: {
+                    if (ast_is_fraction(right)) {
+                        AST *a = right->binop.left;
+                        AST *b = right->binop.right;
+                        
+                        assert(a->type == AST_INTEGER);
+                        assert(b->type == AST_INTEGER);
+
+                        if (a->integer.value < 0.0) {
+                            i64 new_a_value = labs(a->integer.value);
+                            return SUB(left, DIV(INTEGER(new_a_value), b));
+                        } else if (b->integer.value < 0.0) {
+                            i64 new_b_value = labs(b->integer.value);
+                            return SUB(left, DIV(a, INTEGER(new_b_value)));
+                        } else {
+                            panic("unreachable")
+                        }
+
+                    }
+                }
+
+                default: todo();
+
+            }
+
+        }
+    }
+
+    // +- symbolic
+    if (right->type == AST_UNARYOP) {
+        if (right->unaryop.op == OP_USUB) {
+            return interp(ip, SUB(left, right->unaryop.operand));
+        }
+    }
+
     return ADD(left, right);
 }
 
@@ -833,7 +885,9 @@ AST *interp_symbol(Interp *ip, String name) {
 }
 
 AST *interp_program(Interp *ip, ASTArray statements) {
-    assert(statements.size > 0);
+    if (statements.size == 0) {
+        return EMPTY();
+    }
 
     AST *last_result = NULL;
     for (usize i = 0; i < statements.size; i++) {

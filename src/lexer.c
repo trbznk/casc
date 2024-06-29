@@ -117,6 +117,10 @@ Token lexer_next_token(Lexer *lexer) {
             lexer->pos += 1;
         }
 
+        if (lexer_current_char(lexer) == '\0') {
+            token.type = TOKEN_EOF;
+        }
+
         return token;
     } else if (lexer_current_char(lexer) == ',') {
         token.type = TOKEN_COMMA;

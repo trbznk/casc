@@ -40,6 +40,9 @@ typedef struct {
     Allocator allocator;
     Cursor cursor;
     Cells cells;
+
+    bool show_debug_console;
+    String last_debug_output;
 } GUI;
 
 usize cursor_get_col(Cursor cursor, String base) {
@@ -171,6 +174,7 @@ void init_gui() {
 
     GUI gui = {0};
     gui.allocator = init_allocator();
+    gui.last_debug_output = init_string("");
 
     String window_title = init_string("casc");
     i32 screen_width = 800;
@@ -246,6 +250,8 @@ void init_gui() {
             gui.cursor = cursor_increment_by_row(gui.cursor, gui.cells.data[0].content);
         } else if (IsKeyPressed(KEY_UP)) {
             gui.cursor = cursor_decrement_by_row(gui.cursor, gui.cells.data[0].content);
+        } else if (IsKeyDown(KEY_LEFT_SUPER) && IsKeyPressed(KEY_D)) {
+            gui.show_debug_console = !gui.show_debug_console;
         } else if (IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_ENTER)) {
             Allocator allocator = init_allocator();
 
@@ -263,6 +269,8 @@ void init_gui() {
             output = interp(&ip, output);
 
             gui.cells.data[1].content = ast_to_string(&gui.allocator, output);
+
+            gui.last_debug_output = ast_to_debug_string(&gui.allocator, output);
 
             free_allocator(&allocator);
         }
@@ -340,10 +348,20 @@ void init_gui() {
             }
         }
 
+        // debug console
+        if (gui.show_debug_console) {
+            i32 debug_console_height = 200;
+            i32 y_start = screen_height-debug_console_height;
+
+            DrawRectangle(0, y_start, screen_width, debug_console_height, LIGHTGRAY);
+            DrawTextEx(font, gui.last_debug_output.str, (Vector2){ 0+padding.x, y_start+padding.y }, 12, 2, COLOR_DARK_GREEN);
+        }
+
         EndDrawing();
     }
 
     UnloadFont(font);
-
     CloseWindow();
+
+    free(gui.cells.data);
 }
