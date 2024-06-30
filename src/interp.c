@@ -446,6 +446,19 @@ AST* interp_binop_mul(Interp *ip, AST *left, AST *right) {
     } else if (ast_is_numeric(left) && ast_is_numeric(right)) {
         return interp(ip, REAL(ast_to_f64(left)*ast_to_f64(right)));
     }
+
+    // x^n * x
+    if (left->type == AST_BINOP) {
+        if (left->binop.op == OP_POW) {
+            AST *x = left->binop.left;
+            AST *n = left->binop.right;
+            if (ast_match(x, right)) {
+                AST *result = POW(x, ADD(n, INTEGER(1)));
+                return interp(ip, result);
+            }
+        }
+    }
+
     return MUL(left, right);
 }
 
@@ -493,6 +506,8 @@ AST *interp_binop_mod(Interp *ip, AST *left, AST *right) {
 }
 
 AST* interp_binop(Interp *ip, AST *left, AST *right, OpType op) {
+
+    // depth first
     left = interp(ip, left);
     right = interp(ip, right);
 
