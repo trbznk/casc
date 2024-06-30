@@ -137,6 +137,21 @@ Token lexer_next_token(Lexer *lexer) {
         token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
         lexer->pos += 1;
         return token;
+    } else if (lexer_current_char(lexer) == '%') {
+        token.type = TOKEN_PCT;
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
+        lexer->pos += 1;
+        return token;
+    } else if (lexer_current_char(lexer) == '[') {
+        token.type = TOKEN_L_SQB;
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
+        lexer->pos += 1;
+        return token;
+    } else if (lexer_current_char(lexer) == ']') {
+        token.type = TOKEN_R_SQB;
+        token.text = char_to_string(lexer->allocator, lexer_current_char(lexer));
+        lexer->pos += 1;
+        return token;
     } else {
         fprintf(stderr, "ERROR: Can't tokenize '%c'\n", lexer_current_char(lexer));
         exit(1);
@@ -169,8 +184,13 @@ const char *token_type_to_string(TokenType type) {
         case TOKEN_COMMA: return "COMMA";
         case TOKEN_NEW_LINE: return "NEW_LINE";
         case TOKEN_EOF: return "EOF";
-        default:
-            printf("%d\n", type); 
-            assert(false);
+        case TOKEN_PCT: return "PCT";
+        case TOKEN_EQUAL: return "EQUAL";
+        case TOKEN_L_SQB: return "L_SQB";
+        case TOKEN_R_SQB: return "R_SQB";
+        case TOKEN_EXCLAMATION_MARK: return "EXCLAMATION_MARK";
+        case TOKEN_TYPE_COUNT: return "?";
     }
+
+    panic("unreachable")
 }

@@ -20,3 +20,4 @@ $ ./build.sh
 - https://keleshev.com/abstract-syntax-tree-an-example-in-c/
 - https://craftinginterpreters.com
 - https://ruslanspivak.com/lsbasi-part1/
+- Tokens in Python - https://docs.python.org/3/library/token.html

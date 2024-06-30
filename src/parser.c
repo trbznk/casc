@@ -60,6 +60,20 @@ AST *parse_exp(Lexer *lexer) {
             break;
         }
 
+        case TOKEN_L_SQB: {
+            parser_eat(lexer, TOKEN_L_SQB);
+
+            result = init_ast_list(lexer->allocator, DEFAULT_LIST_CAPACITY);
+            list_append(lexer->allocator, result, parse_expr(lexer));
+            while (lexer_peek_token(lexer).type == TOKEN_COMMA) {
+                parser_eat(lexer, TOKEN_COMMA);
+                list_append(lexer->allocator, result, parse_expr(lexer));
+            }
+
+            parser_eat(lexer, TOKEN_R_SQB);
+            return result;
+        }
+
         case TOKEN_MINUS: {
             parser_eat(lexer, TOKEN_MINUS);
             result = init_ast_unaryop(lexer->allocator, parse_factor(lexer), OP_USUB);
@@ -120,6 +134,7 @@ AST *parse_term(Lexer *lexer) {
     while (
         lexer_peek_token(lexer).type == TOKEN_STAR ||
         lexer_peek_token(lexer).type == TOKEN_SLASH ||
+        lexer_peek_token(lexer).type == TOKEN_PCT ||
         lexer_peek_token(lexer).type == TOKEN_IDENTIFIER ||
         lexer_peek_token(lexer).type == TOKEN_L_PAREN
     ) {
@@ -131,6 +146,10 @@ AST *parse_term(Lexer *lexer) {
             case TOKEN_SLASH:
                 parser_eat(lexer, TOKEN_SLASH);
                 result = init_ast_binop(lexer->allocator, result, parse_factor(lexer), OP_DIV);
+                break;
+            case TOKEN_PCT:
+                parser_eat(lexer, TOKEN_PCT);
+                result = init_ast_binop(lexer->allocator, result, parse_factor(lexer), OP_MOD);
                 break;
             case TOKEN_IDENTIFIER:
                 result = init_ast_binop(lexer->allocator, result, parse_factor(lexer), OP_MUL);

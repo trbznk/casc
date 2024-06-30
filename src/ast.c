@@ -47,6 +47,7 @@ const char* ast_type_to_debug_string(ASTType type) {
         case AST_UNARYOP: return "UnaryOp";
         case AST_CALL: return "FuncCall";
         case AST_EMPTY: return "Empty";
+        case AST_LIST: return "List";
         case AST_TYPE_COUNT: assert(false);
     }
 }
@@ -69,7 +70,19 @@ u8 op_type_precedence(OpType type) {
     }
 }
 
+ASTArray init_ast_array_with_capacity(Allocator *allocator, usize capacity) {
+    ASTArray a = {0};
+    a.capacity = capacity;
+
+    // TODO: use capacity here
+    (void) allocator;
+
+    return a;
+}
+
 void ast_array_append(Allocator *allocator, ASTArray *array, AST *node) {
+    // TODO: we dont use the capacity field right now!
+
     AST **new_data = alloc(allocator, sizeof(AST)*(array->size+1));
 
     // currently we move old values to new_data because
@@ -156,6 +169,13 @@ AST* init_ast_empty(Allocator* allocator) {
     AST* node = alloc(allocator, sizeof(AST));
     node->type = AST_EMPTY;
     node->empty = true;
+    return node;
+}
+
+AST *init_ast_list(Allocator *allocator, usize capacity) {
+    AST *node = alloc(allocator, sizeof(AST));
+    node->type = AST_LIST;
+    node->list.nodes = init_ast_array_with_capacity(allocator, capacity);
     return node;
 }
 
@@ -266,4 +286,8 @@ bool ast_is_numeric(AST* node) {
     }
 
     return false;
+}
+
+void list_append(Allocator *allocator, AST *list, AST *node) {
+    ast_array_append(allocator, &list->list.nodes, node);
 }

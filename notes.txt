@@ -1,6 +1,4 @@
 ROADMAP
-- implement 'all' common features of a calculator
-- multiline statements including variables
 - implement 'all' functions from python math module
 - multiple cells (first time kind of a notebook feel)
 - now we need to finally make a 'complete' text editor (highlighting, copy, paste, ...)
@@ -12,3 +10,20 @@ TODO
 BUGS
 - double !
 - right shift enter not working
+
+PYTHON MATH MODULE IMPLEMENTATION
+skipped:
+- math.comb() - we have this with ncr()
+- math.copysign
+- math.frexp()
+- math.fsum()
+- math.isclose()
+- math.isfinite()
+- math.isinf()
+- math.isnan()
+- math.isqrt()
+- math.ldexp()
+- math.modf()
+- math.nextafter()
+progress:
+- math.prod() - we need lists before and then we can do sum() next

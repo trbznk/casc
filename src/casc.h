@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #define MAX_VARIABLES 1024
+#define DEFAULT_LIST_CAPACITY 64
 
 //
 // forward declarations
@@ -57,11 +58,14 @@ typedef enum {
     TOKEN_STAR,
     TOKEN_SLASH,
     TOKEN_CARET,
+    TOKEN_PCT,
 
     TOKEN_EQUAL,
 
     TOKEN_L_PAREN,
     TOKEN_R_PAREN,
+    TOKEN_L_SQB, // square bracket
+    TOKEN_R_SQB,
 
     TOKEN_COMMA,
     TOKEN_HASH,
@@ -110,9 +114,11 @@ bool is_builtin_constant(String);
 #define SUB(left, right) init_ast_binop(ip->allocator, left, right, OP_SUB)
 #define MUL(left, right) init_ast_binop(ip->allocator, left, right, OP_MUL)
 #define DIV(left, right) init_ast_binop(ip->allocator, left, right, OP_DIV)
+#define MOD(left, right) init_ast_binop(ip->allocator, left, right, OP_MOD)
 #define POW(left, right) init_ast_binop(ip->allocator, left, right, OP_POW)
 #define CALL(name, args) init_ast_call(ip->allocator, name, args)
 #define ASSIGN(target, value) init_ast_assign(ip->allocator, target, value)
+#define LIST(capacity) init_ast_list(ip->allocator, capacity)
 #define EMPTY() init_ast_empty(ip->allocator)
 
 typedef struct ASTArray ASTArray;
@@ -122,6 +128,7 @@ typedef enum {
     OP_SUB,
     OP_MUL,
     OP_DIV,
+    OP_MOD,
     OP_POW,
 
     OP_UADD,
@@ -142,6 +149,7 @@ typedef enum {
 
     AST_CALL,
     AST_ASSIGN,
+    AST_LIST,
 
     AST_EMPTY,
 
@@ -149,6 +157,7 @@ typedef enum {
 } ASTType;
 
 struct ASTArray {
+    usize capacity;
     usize size;
     AST **data;
 };
@@ -198,21 +207,27 @@ struct AST {
             ASTArray statements;
         } program;
 
+        struct {
+            ASTArray nodes;
+        } list;
+
         bool empty; // TODO: temporary for ASTType empty
     };
 };
 
-AST* init_ast_program(Allocator*);
-AST* init_ast_assign(Allocator*, AST *target, AST *value);
-AST* init_ast_integer(Allocator*, i64);
-AST* init_ast_real(Allocator*, f64);
-AST* init_ast_symbol(Allocator*, String);
-AST* init_ast_constant(Allocator*, String);
-AST* init_ast_binop(Allocator*, AST*, AST*, OpType);
-AST* init_ast_unaryop(Allocator*, AST*, OpType);
-AST* init_ast_call(Allocator*, String, ASTArray);
-AST* init_ast_empty(Allocator*);
+AST *init_ast_list(Allocator*, usize capacity);
+AST *init_ast_program(Allocator*);
+AST *init_ast_assign(Allocator*, AST *target, AST *value);
+AST *init_ast_integer(Allocator*, i64);
+AST *init_ast_real(Allocator*, f64);
+AST *init_ast_symbol(Allocator*, String);
+AST *init_ast_constant(Allocator*, String);
+AST *init_ast_binop(Allocator*, AST*, AST*, OpType);
+AST *init_ast_unaryop(Allocator*, AST*, OpType);
+AST *init_ast_call(Allocator*, String, ASTArray);
+AST *init_ast_empty(Allocator*);
 
+ASTArray init_ast_array_with_capacity(Allocator*, usize capacity);
 void ast_array_append(Allocator*, ASTArray*, AST*);
 
 const char *op_type_to_debug_string(OpType);
@@ -226,6 +241,8 @@ bool ast_is_fraction(AST*);
 bool ast_is_numeric(AST*);
 
 f64 ast_to_f64(AST*);
+
+void list_append(Allocator*, AST *list, AST *node); 
 
 //
 // parser

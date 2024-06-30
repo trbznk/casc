@@ -23,7 +23,9 @@ const FunctionSignature BUILTIN_FUNCTIONS[] =  {
     {"factorial", 1},
     {"npr", 2}, {"ncr", 2},
     {"gcd", 2}, {"lcm", 2},
-    {"diff", 1}, {"diff", 2}
+    {"diff", 1}, {"diff", 2},
+    {"ceil", 1}, {"floor", 1},
+    {"sum", 1}, {"prod", 1} // TODO: add variadic arguments here
 };
 const usize BUILTIN_FUNCTIONS_COUNT = sizeof(BUILTIN_FUNCTIONS) / sizeof(FunctionSignature);
 
@@ -185,8 +187,16 @@ String ast_to_debug_string(Allocator *allocator, AST* node) {
         }
 
         case AST_EMPTY: sprintf(output.str, "Empty()"); break;
-        
-        default: fprintf(stderr, "ERROR: Cannot do 'ast_to_debug_string' because node type '%s' is not implemented.\n", ast_type_to_debug_string(node->type)); exit(1);
+
+        case AST_PROGRAM: todo();
+
+        case AST_CONSTANT: todo();
+
+        case AST_ASSIGN: todo();
+
+        case AST_LIST: sprintf(output.str, "List(...)"); break;
+
+        case AST_TYPE_COUNT: todo();  
     
     }
     return output;
@@ -251,6 +261,10 @@ String _ast_to_string(Allocator *allocator, AST* node, u8 op_precedence) {
                 // multiple args to string @todo
                 sprintf(output.str, "%s(args)", node->func_call.name.str); break;
             }
+        }
+
+        case AST_LIST: {
+            sprintf(output.str, "[elements]"); break;
         }
 
         case AST_EMPTY: break;
@@ -468,6 +482,16 @@ AST *interp_binop_pow(Interp *ip, AST *left, AST *right) {
     return POW(left, right);
 }
 
+AST *interp_binop_mod(Interp *ip, AST *left, AST *right) {
+    if (left->type == AST_INTEGER && right->type == AST_INTEGER) {
+        i64 a = left->integer.value;
+        i64 b = right->integer.value;
+        return INTEGER(a%b);
+    }
+
+    return MOD(left, right);
+}
+
 AST* interp_binop(Interp *ip, AST *left, AST *right, OpType op) {
     left = interp(ip, left);
     right = interp(ip, right);
@@ -478,6 +502,7 @@ AST* interp_binop(Interp *ip, AST *left, AST *right, OpType op) {
         case OP_MUL: return interp_binop_mul(ip, left, right);
         case OP_DIV: return interp_binop_div(ip, left, right);
         case OP_POW: return interp_binop_pow(ip, left, right);
+        case OP_MOD: return interp_binop_mod(ip, left, right);
         default: assert(false);
     }
 }
@@ -782,8 +807,59 @@ AST* interp_sqrt(Interp *ip, AST *x) {
     return CALL(init_string("sqrt"), args);
 }
 
+AST *interp_floor(Interp *ip, AST *x) {
+    if (x->type == AST_REAL) {
+        i64 value = floor(x->real.value);
+        return INTEGER(value);
+    }
+
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, x);
+    return CALL(init_string("floor"), args);
+}
+
+AST *interp_ceil(Interp *ip, AST *x) {
+    if (x->type == AST_REAL) {
+        i64 value = ceil(x->real.value);
+        return INTEGER(value);
+    }
+
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, x);
+    return CALL(init_string("ceil"), args);
+}
+
+AST *interp_sum(Interp *ip, AST *v) {
+    if (v->type == AST_LIST) {
+        AST *result = INTEGER(0);
+        for (usize i = 0; i < v->list.nodes.size; i++) {
+            result = ADD(result, v->list.nodes.data[i]);
+        }
+        return interp(ip, result);
+    }
+
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, v);
+    return CALL(init_string("sum"), args);
+}
+
+AST *interp_prod(Interp *ip, AST *v) {
+    if (v->type == AST_LIST) {
+        AST *result = INTEGER(1);
+        for (usize i = 0; i < v->list.nodes.size; i++) {
+            result = MUL(result, v->list.nodes.data[i]);
+        }
+        return interp(ip, result);
+    }
+
+    ASTArray args = {0};
+    ast_array_append(ip->allocator, &args, v);
+    return CALL(init_string("prod"), args);
+}
+
 AST* interp_call(Interp *ip, String name, ASTArray args) {
 
+    // depth first
     for (usize i = 0; i < args.size; i++) {
         args.data[i] = interp(ip, args.data[i]);
     }
@@ -834,6 +910,14 @@ AST* interp_call(Interp *ip, String name, ASTArray args) {
         return interp(ip, POW(args.data[0], args.data[1]));
     } else if (string_eq(name, init_string("exp"))) {
         return interp(ip, POW(CONSTANT(init_string("e")), args.data[0]));
+    } else if (string_eq(name, init_string("floor"))) {
+        return interp_floor(ip, args.data[0]);
+    } else if (string_eq(name, init_string("ceil"))) {
+        return interp_ceil(ip, args.data[0]);
+    } else if (string_eq(name, init_string("sum"))) {
+        return interp_sum(ip, args.data[0]);
+    } else if (string_eq(name, init_string("prod"))) {
+        return interp_prod(ip, args.data[0]);
     } else if (string_eq(name, init_string("diff"))) {
         AST* diff_var;
 
@@ -927,7 +1011,16 @@ AST *interp_assign(Interp *ip, AST *target, AST *value) {
     return EMPTY();
 }
 
-AST *interp(Interp *ip, AST* node) {
+AST *interp_list(Interp *ip, AST *node) {
+    // depth first
+    for (usize i = 0; i < node->list.nodes.size; i++) {
+        node->list.nodes.data[i] = interp(ip, node->list.nodes.data[i]);
+    }
+
+    return node;
+}
+
+AST *interp(Interp *ip, AST *node) {
     switch (node->type) {
         case AST_PROGRAM:
             return interp_program(ip, node->program.statements);
@@ -952,6 +1045,10 @@ AST *interp(Interp *ip, AST* node) {
             return interp_call(ip, node->func_call.name, node->func_call.args);
         case AST_ASSIGN:
             return interp_assign(ip, node->assign.target, node->assign.value);
+        case AST_LIST:
+            // TODO: maybe we should find a way to althoug unpack the list here.
+            //       For example only pass the ASTArray nodes field as agument
+            return interp_list(ip, node);
         case AST_EMPTY:
             return node;
         default:
